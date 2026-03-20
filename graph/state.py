@@ -95,12 +95,14 @@ def is_investigation_todo(todo: Todo) -> bool:
 PLANNER_STATUS_NEED_INVESTIGATION: Literal["need_investigation"] = "need_investigation"
 PLANNER_STATUS_READY_FOR_APPROVAL: Literal["ready_for_approval"] = "ready_for_approval"
 PLANNER_STATUS_DONE_NO_EXECUTION: Literal["done_no_execution"] = "done_no_execution"
+PLANNER_STATUS_NEED_HISTORY_DETAIL: Literal["need_history_detail"] = "need_history_detail"
 PLANNER_STATUS_ERROR: Literal["error"] = "error"
 
 VALID_PLANNER_STATUSES: frozenset[str] = frozenset({
     PLANNER_STATUS_NEED_INVESTIGATION,
     PLANNER_STATUS_READY_FOR_APPROVAL,
     PLANNER_STATUS_DONE_NO_EXECUTION,
+    PLANNER_STATUS_NEED_HISTORY_DETAIL,
     PLANNER_STATUS_ERROR,
 })
 
@@ -147,7 +149,12 @@ class AgentState(TypedDict, total=False):
     channel_id: int
     user_id: int
     user_permissions: dict[str, bool]
+    locale: str
     bot: Any
+
+    # 会話履歴
+    conversation_history: list[dict[str, Any]]
+    history_detail: str
 
     # 処理中
     todos: list[Todo]

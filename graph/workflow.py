@@ -8,11 +8,13 @@ from graph.state import (
     AgentState,
     PLANNER_STATUS_DONE_NO_EXECUTION,
     PLANNER_STATUS_ERROR,
+    PLANNER_STATUS_NEED_HISTORY_DETAIL,
     PLANNER_STATUS_NEED_INVESTIGATION,
     PLANNER_STATUS_READY_FOR_APPROVAL,
     agent_target_from_name,
     is_execution_todo,
 )
+from i18n import t
 
 logger = logging.getLogger("discord_bot")
 
@@ -153,6 +155,13 @@ def build_pre_approval_workflow() -> StateGraph:
                 "approval_summary": decision.get("summary", ""),
                 "approval_status": "none",
             }
+        elif decision["status"] == PLANNER_STATUS_NEED_HISTORY_DETAIL:
+            return {
+                "planner_decision": decision,
+                "planning_iteration": iteration,
+                "planning_history": history,
+                "plan_status": "need_history_detail",
+            }
         else:
             return {
                 "planner_decision": decision,
@@ -163,6 +172,25 @@ def build_pre_approval_workflow() -> StateGraph:
             }
 
     workflow.add_node("plan_next_step", plan_next_step)
+
+    async def resolve_history(state: AgentState) -> dict[str, Any]:
+        """要求された過去セッションのJSONL詳細ログを読み込む。"""
+        from database.conversation import load_session_detail
+
+        decision = state.get("planner_decision", {})
+        session_id = decision.get("session_id", "")
+        guild_id = state.get("guild_id", 0)
+        user_id = state.get("user_id", 0)
+
+        detail = load_session_detail(guild_id, user_id, session_id)
+
+        logger.info("Loaded history detail for session %s", session_id)
+        return {
+            "history_detail": detail,
+            "plan_status": "planning",
+        }
+
+    workflow.add_node("resolve_history", resolve_history)
 
     async def run_investigations(state: AgentState) -> dict[str, Any]:
         """調査エージェントを実行する。"""
@@ -190,12 +218,12 @@ def build_pre_approval_workflow() -> StateGraph:
                         "Investigation agent %s not available", agent_name,
                     )
                     results[agent_name] = {
-                        "error": f"Agent {agent_name} not available",
+                        "error": t("wf.agent_not_available", locale=state.get("locale", "en"), name=agent_name),
                     }
                     continue
                 if not guild:
                     logger.warning("Guild %s not found for investigation %s", state.get("guild_id"), agent_name)
-                    results[agent_name] = {"error": "Guild not found"}
+                    results[agent_name] = {"error": t("wf.guild_not_found", locale=state.get("locale", "en"))}
                     continue
                 try:
                     new_state = await agent.run(investigation_state, guild)
@@ -307,8 +335,9 @@ def build_pre_approval_workflow() -> StateGraph:
     def finalize_error(state: AgentState) -> dict[str, Any]:
         """エラー時に最終応答を生成する。"""
         error = state.get("error", "Unknown error")
+        locale = state.get("locale", "en")
         return {
-            "final_response": f"Error: {error}",
+            "final_response": t("wf.error_prefix", locale=locale, error=error),
             "plan_status": "error",
         }
 
@@ -323,8 +352,9 @@ def build_pre_approval_workflow() -> StateGraph:
             parts.append(inv_summary)
         if summary and summary != inv_summary:
             parts.append(summary)
+        locale = state.get("locale", "en")
         return {
-            "final_response": "\n\n".join(parts) if parts else "Investigation complete.",
+            "final_response": "\n\n".join(parts) if parts else t("wf.investigation_complete", locale=locale),
             "plan_status": "done_no_execution",
         }
 
@@ -341,14 +371,19 @@ def build_pre_approval_workflow() -> StateGraph:
             return "prepare_approval"
         if plan_status == "done_no_execution":
             return "finalize_no_execution"
+        if plan_status == "need_history_detail":
+            return "resolve_history"
         return "finalize_error"
 
     workflow.add_conditional_edges("plan_next_step", after_plan, {
         "run_investigations": "run_investigations",
         "prepare_approval": "prepare_approval",
         "finalize_no_execution": "finalize_no_execution",
+        "resolve_history": "resolve_history",
         "finalize_error": "finalize_error",
     })
+
+    workflow.add_edge("resolve_history", "plan_next_step")
 
     def after_investigation(state: AgentState) -> str:
         plan_status = state.get("plan_status", "")
@@ -434,11 +469,11 @@ def build_post_approval_workflow() -> StateGraph:
                 target = agent_target_from_name(agent_name)
                 agent = load_agent_module(target, "execution")
                 if not agent:
-                    results[agent_name] = {"error": f"Agent {agent_name} not available"}
+                    results[agent_name] = {"error": t("wf.agent_not_available", locale=state.get("locale", "en"), name=agent_name)}
                     continue
                 if not guild:
                     logger.warning("Guild %s not found for execution %s", state.get("guild_id"), agent_name)
-                    results[agent.name] = {"error": "Guild not found"}
+                    results[agent.name] = {"error": t("wf.guild_not_found", locale=state.get("locale", "en"))}
                     continue
                 try:
                     new_state = await agent.run(execution_state, guild)
@@ -477,8 +512,9 @@ def build_post_approval_workflow() -> StateGraph:
         approval_status = state.get("approval_status", "")
 
         if approval_status == "rejected":
+            locale = state.get("locale", "en")
             return {
-                "final_response": "Request cancelled by user.",
+                "final_response": t("wf.request_cancelled", locale=locale),
                 "plan_status": "completed",
             }
 
@@ -496,10 +532,12 @@ def build_post_approval_workflow() -> StateGraph:
                 else:
                     text = str(value)[:200]
                     result_parts.append(f"- {key}: {text}")
-            parts.append("Execution results:\n" + "\n".join(result_parts))
+            locale = state.get("locale", "en")
+            parts.append(t("wf.execution_results_header", locale=locale) + "\n".join(result_parts))
 
+        locale = state.get("locale", "en")
         return {
-            "final_response": "\n\n".join(parts) if parts else "Done.",
+            "final_response": "\n\n".join(parts) if parts else t("wf.done", locale=locale),
             "plan_status": "completed",
         }
 

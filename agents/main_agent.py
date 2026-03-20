@@ -6,6 +6,8 @@ from typing import Any
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import HumanMessage, SystemMessage
 
+from agents.log import log_ai_exchange
+from agents.prompts import PLANNING_SYSTEM_PROMPT, SYSTEM_PROMPT
 from agents.registry import (
     EXECUTION_TARGETS,
     INVESTIGATION_TARGETS,
@@ -85,58 +87,6 @@ def _parse_json_from_llm(text: str) -> dict[str, Any]:
         raise ValueError("Expected a JSON object from LLM response")
     return parsed
 
-SYSTEM_PROMPT = """You are a Discord server management assistant.
-Given a user request, determine which management areas are relevant and what actions are needed.
-
-Respond ONLY with a JSON object with this structure:
-{{
-  "investigation_targets": ["server", "channel", ...],
-  "execution_candidates": [
-    {{"agent": "channel_execution", "action": "create", "params": {{"name": "...", ...}}}}
-  ]
-}}
-
-Available investigation targets: {investigation_targets}
-Available execution agents: {execution_agents}
-
-Rules:
-- Only include targets that are actually needed
-- If the request is read-only (checking info), execution_candidates should be empty
-- Be specific with params for execution candidates
-- Only use agents that actually exist in the list above
-"""
-
-PLANNING_SYSTEM_PROMPT = """You are a Discord server management planner.
-Based on the user request and investigation results so far, decide the next step.
-
-Respond ONLY with a JSON object with this structure:
-{{
-  "status": "need_investigation" | "ready_for_approval" | "done_no_execution" | "error",
-  "investigation_targets": ["server", "channel", ...],
-  "execution_candidates": [
-    {{"agent": "channel_execution", "action": "create", "params": {{"name": "...", ...}}}}
-  ],
-  "replace_todos": true | false,
-  "summary": "Brief description of what you decided and why"
-}}
-
-Available investigation targets: {investigation_targets}
-Available execution agents: {execution_agents}
-
-Rules:
-- status "need_investigation": more info needed before proposing execution. Include new investigation_targets.
-- status "ready_for_approval": ready to show execution candidates to the user for approval.
-- status "done_no_execution": the request is purely informational, no execution needed.
-- status "error": something went wrong or the request cannot be fulfilled.
-- Only include investigation_targets that haven't been completed yet.
-- Do NOT repeat investigations that already have results.
-- replace_todos=true: replace all draft todos with new ones. false: append new todos to existing.
-- execution_candidates must use the format {{"agent": "<target>_execution", "action": "...", "params": {{...}}}}
-- CRITICAL: Never propose execution actions before investigation is complete.
-- CRITICAL: Only use agents that actually exist in the list above.
-"""
-
-
 class MainAgent:
     """オーケストレーター。リクエストの解析・タスク分解・エージェントへの振り分けを行う。"""
 
@@ -162,13 +112,28 @@ class MainAgent:
             execution_agents=agents_str,
         )
 
+        messages = [
+            SystemMessage(content=prompt),
+            HumanMessage(content=state["request"]),
+        ]
         try:
-            response = await self.llm.ainvoke([
-                SystemMessage(content=prompt),
-                HumanMessage(content=state["request"]),
-            ])
-            return _parse_json_from_llm(response.content)
+            response = await self.llm.ainvoke(messages)
+            parsed = _parse_json_from_llm(response.content)
+            await log_ai_exchange(
+                "parse_request",
+                state,
+                messages,
+                response_text=response.content,
+                parsed=parsed,
+            )
+            return parsed
         except Exception as e:
+            await log_ai_exchange(
+                "parse_request",
+                state,
+                messages,
+                error=str(e),
+            )
             logger.error("Failed to parse request with LLM: %s", e)
             return {"investigation_targets": [], "execution_candidates": [], "todos": []}
 
@@ -233,19 +198,60 @@ class MainAgent:
                 todos_summary.append(f"  [{agent}] {action}({param_str})")
             context_parts.append("Current draft todos:\n" + "\n".join(todos_summary))
 
+        # Build history section for prompt
+        history = state.get("conversation_history", [])
+        if history:
+            history_lines = []
+            for i, turn in enumerate(history, 1):
+                history_lines.append(
+                    f"Turn {i} (session_id: {turn['session_id']}):\n"
+                    f"  User request: {turn['request']}\n"
+                    f"  Bot response: {turn['response']}"
+                )
+            history_section = (
+                "The user has had these previous conversations in this server:\n"
+                + "\n".join(history_lines)
+                + "\nIf the user's current request references a previous "
+                "conversation, use status 'need_history_detail' with the "
+                "matching session_id to load detailed logs.\n"
+            )
+        else:
+            history_section = ""
+
+        # Include history detail if previously loaded
+        history_detail = state.get("history_detail")
+        if history_detail:
+            context_parts.append("Detailed logs for the requested session:\n" + history_detail)
+
         prompt = PLANNING_SYSTEM_PROMPT.format(
             investigation_targets=targets_str,
             execution_agents=agents_str,
+            history_section=history_section,
         )
 
+        messages = [
+            SystemMessage(content=prompt),
+            HumanMessage(content="\n\n".join(context_parts)),
+        ]
         try:
-            response = await self.llm.ainvoke([
-                SystemMessage(content=prompt),
-                HumanMessage(content="\n\n".join(context_parts)),
-            ])
+            response = await self.llm.ainvoke(messages)
             decision = _parse_json_from_llm(response.content)
-            return _validate_planner_decision(decision)
+            validated = _validate_planner_decision(decision)
+            await log_ai_exchange(
+                "plan_next_step",
+                state,
+                messages,
+                response_text=response.content,
+                parsed=validated,
+            )
+            return validated
         except Exception as e:
+            await log_ai_exchange(
+                "plan_next_step",
+                state,
+                messages,
+                error=str(e),
+            )
             logger.error("Failed to plan next step with LLM: %s", e)
             return {
                 "status": "error",
@@ -336,6 +342,9 @@ def _validate_planner_decision(decision: dict[str, Any]) -> dict[str, Any]:
 
     summary = decision.get("summary", "")
 
+    # need_history_detail does not require targets/candidates
+    session_id = decision.get("session_id", "")
+
     if status == PLANNER_STATUS_READY_FOR_APPROVAL and not candidates:
         status = PLANNER_STATUS_ERROR
         summary = summary or "No execution candidates provided for approval."
@@ -350,4 +359,5 @@ def _validate_planner_decision(decision: dict[str, Any]) -> dict[str, Any]:
         "execution_candidates": candidates,
         "replace_todos": replace,
         "summary": summary,
+        "session_id": session_id,
     }
