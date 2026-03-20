@@ -9,13 +9,15 @@ class VoiceChannelExecutionAgent(MultiActionExecutionAgent):
     """ボイスチャンネルの操作（メンバー移動・ミュート・切断・チャンネル編集）を行うエージェント。"""
 
     ACTION_PERMISSIONS: dict[str, list[str]] = {
+        "create": ["manage_channels"],
+        "delete": ["manage_channels"],
+        "edit_channel": ["manage_channels"],
         "move_user": ["move_members"],
         "mute": ["mute_members"],
         "unmute": ["mute_members"],
         "deafen": ["deafen_members"],
         "undeafen": ["deafen_members"],
         "disconnect": ["move_members"],
-        "edit_channel": ["manage_channels"],
     }
 
     @property
@@ -24,18 +26,50 @@ class VoiceChannelExecutionAgent(MultiActionExecutionAgent):
 
     async def _dispatch(self, action: str, params: dict, guild: discord.Guild) -> dict:
         handlers = {
+            "create": self._create,
+            "delete": self._delete,
+            "edit_channel": self._edit_channel,
             "move_user": self._move_user,
             "mute": self._mute,
             "unmute": self._unmute,
             "deafen": self._deafen,
             "undeafen": self._undeafen,
             "disconnect": self._disconnect,
-            "edit_channel": self._edit_channel,
         }
         handler = handlers.get(action)
         if not handler:
             return {"success": False, "action": action, "details": t("err.unknown_action", locale=self._locale, action=action)}
         return await handler(params, guild)
+
+    async def _create(self, params: dict, guild: discord.Guild) -> dict:
+        """ボイスチャンネルを作成する。"""
+        name = params.get("name")
+        if not name:
+            return {"success": False, "action": "create", "details": t("exec.missing_param", locale=self._locale, param="name")}
+
+        category_id = params.get("category_id")
+        category = guild.get_channel(category_id) if category_id else None
+
+        try:
+            channel = await guild.create_voice_channel(name=name, category=category)
+            return {"success": True, "action": "create", "details": t("exec.channel.created", locale=self._locale, name=channel.name, id=channel.id)}
+        except (discord.Forbidden, discord.HTTPException) as e:
+            return {"success": False, "action": "create", "details": str(e)}
+
+    async def _delete(self, params: dict, guild: discord.Guild) -> dict:
+        """ボイスチャンネルを削除する。"""
+        channel_id = params.get("channel_id")
+        if not channel_id:
+            return {"success": False, "action": "delete", "details": t("exec.missing_param", locale=self._locale, param="channel_id")}
+        channel = guild.get_channel(channel_id)
+        if not channel:
+            return {"success": False, "action": "delete", "details": t("not_found.channel", locale=self._locale, id=channel_id)}
+        channel_name = channel.name
+        try:
+            await channel.delete()
+            return {"success": True, "action": "delete", "details": t("exec.channel.deleted", locale=self._locale, name=channel_name)}
+        except (discord.Forbidden, discord.HTTPException) as e:
+            return {"success": False, "action": "delete", "details": str(e)}
 
     async def _move_user(self, params: dict, guild: discord.Guild) -> dict:
         """メンバーをボイスチャンネルに移動させる。"""
