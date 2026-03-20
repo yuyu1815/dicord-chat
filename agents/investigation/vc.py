@@ -45,6 +45,7 @@ class VCInvestigationAgent(InvestigationAgent):
                 "current_members": current_members,
                 "member_count": len(vc.members),
                 "nsfw": vc.nsfw,
+                "permissions_synced": vc.permissions_synced,
                 "status": vc.status if hasattr(vc, "status") else None,
             })
 

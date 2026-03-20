@@ -34,6 +34,7 @@ class ChannelInvestigationAgent(InvestigationAgent):
             }
             topic = getattr(ch, "topic", None)
             base["topic"] = (topic[:MAX_TOPIC_LENGTH] if topic and len(topic) > MAX_TOPIC_LENGTH else topic)
+            base["permissions_synced"] = ch.permissions_synced
             return base
 
         text_channels = [_channel_info(ch) for ch in guild.text_channels]
