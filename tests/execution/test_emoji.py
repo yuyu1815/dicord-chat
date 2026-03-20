@@ -125,7 +125,7 @@ async def test_forbidden_error(mock_guild, approved_state):
     
     # Assert
     assert result["success"] is False
-    assert "Missing permissions" in result["details"]
+    assert "No permission" in result["details"]
 
 
 def test_emoji_agent_name():

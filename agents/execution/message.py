@@ -1,3 +1,5 @@
+import io
+
 import discord
 
 from agents.base import MultiActionExecutionAgent
@@ -61,13 +63,13 @@ class MessageExecutionAgent(MultiActionExecutionAgent):
         if embed_data:
             embed = discord.Embed.from_dict(embed_data) if isinstance(embed_data, dict) else None
 
-        files = []
+        files: list[discord.File] = []
         raw_files = params.get("files", [])
         for file_info in raw_files:
-            if isinstance(file_info, str):
-                files.append(discord.File(file_info))
-            elif isinstance(file_info, dict):
-                files.append(discord.File(file_info["path"], filename=file_info.get("filename")))
+            if isinstance(file_info, bytes):
+                files.append(discord.File(io.BytesIO(file_info), filename=file_info.get("filename", "file") if isinstance(file_info, dict) else "file"))
+            elif isinstance(file_info, dict) and isinstance(file_info.get("data"), bytes):
+                files.append(discord.File(io.BytesIO(file_info["data"]), filename=file_info.get("filename", "file")))
 
         try:
             reference = None

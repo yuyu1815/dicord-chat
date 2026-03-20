@@ -1,3 +1,5 @@
+import io
+
 import discord
 
 from agents.base import SingleActionExecutionAgent
@@ -78,12 +80,12 @@ class WebhookExecutionAgent(SingleActionExecutionAgent):
                     embeds.append(discord.Embed.from_dict(e))
             kwargs["embeds"] = embeds
 
-        files = []
+        files: list[discord.File] = []
         for file_info in params.get("files", []):
-            if isinstance(file_info, str):
-                files.append(discord.File(file_info))
-            elif isinstance(file_info, dict):
-                files.append(discord.File(file_info["path"], filename=file_info.get("filename")))
+            if isinstance(file_info, bytes):
+                files.append(discord.File(io.BytesIO(file_info)))
+            elif isinstance(file_info, dict) and isinstance(file_info.get("data"), bytes):
+                files.append(discord.File(io.BytesIO(file_info["data"]), filename=file_info.get("filename", "file")))
         if files:
             kwargs["files"] = files
 

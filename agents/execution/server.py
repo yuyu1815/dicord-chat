@@ -4,6 +4,7 @@ from i18n import t
 
 from agents.base import MultiActionExecutionAgent
 from graph.state import AgentState
+from services.attachment import AttachmentError, fetch_image_bytes, fetch_url_bytes
 
 
 class ServerExecutionAgent(MultiActionExecutionAgent):
@@ -122,6 +123,27 @@ class ServerExecutionAgent(MultiActionExecutionAgent):
     async def _edit_banner(self, params: dict, guild: discord.Guild) -> dict:
         """サーバーバナー画像を設定する。"""
         banner = params.get("banner")
+        url = params.get("url")
+        message_id = params.get("message_id")
+
+        if message_id and not banner:
+            channel_id = params.get("channel_id")
+            if not channel_id:
+                return {"success": False, "action": "edit_banner", "details": t("exec.missing_param", locale=self._locale, param="channel_id")}
+            channel = guild.get_channel(channel_id)
+            if not channel or not isinstance(channel, (discord.TextChannel, discord.Thread)):
+                return {"success": False, "action": "edit_banner", "details": t("not_found.channel", locale=self._locale, id=channel_id)}
+            try:
+                _, banner = await fetch_image_bytes(channel, message_id, filename=params.get("filename"))
+            except AttachmentError as e:
+                return {"success": False, "action": "edit_banner", "details": str(e.reason)}
+
+        if not banner and url:
+            try:
+                banner = await fetch_url_bytes(url, allowed_types=("image/",))
+            except AttachmentError as e:
+                return {"success": False, "action": "edit_banner", "details": str(e.reason)}
+
         if not banner:
             return {"success": False, "action": "edit_banner", "details": t("exec.server.missing_banner", locale=self._locale)}
         try:
@@ -133,6 +155,27 @@ class ServerExecutionAgent(MultiActionExecutionAgent):
     async def _edit_icon(self, params: dict, guild: discord.Guild) -> dict:
         """サーバーアイコンを変更する。"""
         icon = params.get("icon")
+        url = params.get("url")
+        message_id = params.get("message_id")
+
+        if message_id and not icon:
+            channel_id = params.get("channel_id")
+            if not channel_id:
+                return {"success": False, "action": "edit_icon", "details": t("exec.missing_param", locale=self._locale, param="channel_id")}
+            channel = guild.get_channel(channel_id)
+            if not channel or not isinstance(channel, (discord.TextChannel, discord.Thread)):
+                return {"success": False, "action": "edit_icon", "details": t("not_found.channel", locale=self._locale, id=channel_id)}
+            try:
+                _, icon = await fetch_image_bytes(channel, message_id, filename=params.get("filename"))
+            except AttachmentError as e:
+                return {"success": False, "action": "edit_icon", "details": str(e.reason)}
+
+        if not icon and url:
+            try:
+                icon = await fetch_url_bytes(url, allowed_types=("image/",))
+            except AttachmentError as e:
+                return {"success": False, "action": "edit_icon", "details": str(e.reason)}
+
         if not icon:
             return {"success": False, "action": "edit_icon", "details": t("exec.missing_param", locale=self._locale, param="icon")}
         try:

@@ -132,12 +132,10 @@ def test_action_permissions_defined():
 
 
 @pytest.mark.asyncio
-async def test_execute_webhook_with_file(mock_guild, approved_state, tmp_path):
+async def test_execute_webhook_with_file(mock_guild, approved_state):
     # Arrange
     agent = WebhookExecutionAgent()
-    test_file = tmp_path / "test.txt"
-    test_file.write_text("hello")
-    approved_state["todos"] = [{"agent": "webhook_execution", "action": "execute", "params": {"webhook_id": 10001, "content": "With file", "files": [str(test_file)]}}]
+    approved_state["todos"] = [{"agent": "webhook_execution", "action": "execute", "params": {"webhook_id": 10001, "content": "With file", "files": [{"data": b"hello", "filename": "test.txt"}]}}]
     webhook = MagicMock()
     webhook.send = AsyncMock()
     mock_bot = MagicMock()
@@ -157,14 +155,10 @@ async def test_execute_webhook_with_file(mock_guild, approved_state, tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_execute_webhook_with_multiple_files(mock_guild, approved_state, tmp_path):
+async def test_execute_webhook_with_multiple_files(mock_guild, approved_state):
     # Arrange
     agent = WebhookExecutionAgent()
-    file_a = tmp_path / "a.txt"
-    file_a.write_text("a")
-    file_b = tmp_path / "b.txt"
-    file_b.write_text("b")
-    approved_state["todos"] = [{"agent": "webhook_execution", "action": "execute", "params": {"webhook_id": 10001, "content": "Multi", "files": [{"path": str(file_a), "filename": "custom_a.txt"}, str(file_b)]}}]
+    approved_state["todos"] = [{"agent": "webhook_execution", "action": "execute", "params": {"webhook_id": 10001, "content": "Multi", "files": [{"data": b"a", "filename": "custom_a.txt"}, {"data": b"b", "filename": "b.txt"}]}}]
     webhook = MagicMock()
     webhook.send = AsyncMock()
     mock_bot = MagicMock()

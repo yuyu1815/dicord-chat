@@ -5,6 +5,7 @@ import discord
 from agents.base import SingleActionExecutionAgent
 from graph.state import AgentState
 from i18n import t
+from services.attachment import AttachmentError, fetch_image_bytes, fetch_url_bytes
 
 NAME = "sticker_execution"
 
@@ -36,7 +37,32 @@ class StickerExecutionAgent(SingleActionExecutionAgent):
         return io.BytesIO(data)
 
     async def _do_create(self, guild: discord.Guild, params: dict) -> dict:
-        file = self._resolve_file(params.get("file"))
+        file_data = params.get("file")
+        url = params.get("url")
+        message_id = params.get("message_id")
+
+        if file_data is None and message_id:
+            channel_id = params.get("channel_id")
+            if not channel_id:
+                return {"success": False, "action": "create", "details": t("exec.missing_param", locale=self._locale, param="channel_id")}
+            channel = guild.get_channel(channel_id)
+            if not channel or not isinstance(channel, (discord.TextChannel, discord.Thread)):
+                return {"success": False, "action": "create", "details": t("not_found.channel", locale=self._locale, id=channel_id)}
+            try:
+                _, file_data = await fetch_image_bytes(channel, message_id, filename=params.get("filename"))
+            except AttachmentError as e:
+                return {"success": False, "action": "create", "details": str(e.reason)}
+
+        if file_data is None and url:
+            try:
+                file_data = await fetch_url_bytes(url, allowed_types=("image/",))
+            except AttachmentError as e:
+                return {"success": False, "action": "create", "details": str(e.reason)}
+
+        try:
+            file = self._resolve_file(file_data)
+        except ValueError as e:
+            return {"success": False, "action": "create", "details": str(e)}
 
         kwargs: dict = {
             "name": params["name"],
