@@ -6,6 +6,11 @@ from typing import Any
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import HumanMessage, SystemMessage
 
+from agents.registry import (
+    EXECUTION_TARGETS,
+    INVESTIGATION_TARGETS,
+    get_execution_agent_names,
+)
 from graph.state import AgentState
 
 logger = logging.getLogger("discord_bot")
@@ -70,20 +75,6 @@ def _parse_json_from_llm(text: str) -> dict[str, Any]:
     if not isinstance(parsed, dict):
         raise ValueError("Expected a JSON object from LLM response")
     return parsed
-
-INVESTIGATION_TARGETS = [
-    "server", "channel", "category", "thread", "forum",
-    "message", "role", "permission", "member", "vc",
-    "stage", "event", "automod", "invite", "webhook",
-    "emoji", "sticker", "soundboard", "audit_log",
-]
-
-EXECUTION_TARGETS = [
-    "server", "channel", "category", "thread", "forum",
-    "message", "role", "permission", "member", "vc",
-    "stage", "event", "automod", "invite", "webhook",
-    "emoji", "sticker", "soundboard",
-]
 
 SYSTEM_PROMPT = """You are a Discord server management assistant.
 Given a user request, determine which management areas are relevant and what actions are needed.
@@ -156,7 +147,7 @@ class MainAgent:
             return {"investigation_targets": [], "execution_candidates": [], "todos": []}
 
         targets_str = ", ".join(INVESTIGATION_TARGETS)
-        agents_str = ", ".join(f"{t}_execution" for t in EXECUTION_TARGETS)
+        agents_str = ", ".join(get_execution_agent_names())
         prompt = SYSTEM_PROMPT.format(
             investigation_targets=targets_str,
             execution_agents=agents_str,
@@ -199,7 +190,7 @@ class MainAgent:
             status, investigation_targets, execution_candidates, replace_todos, summary を含む。
         """
         targets_str = ", ".join(INVESTIGATION_TARGETS)
-        agents_str = ", ".join(f"{t}_execution" for t in EXECUTION_TARGETS)
+        agents_str = ", ".join(get_execution_agent_names())
 
         completed = state.get("completed_investigation_agents", [])
         results = state.get("investigation_results", {})

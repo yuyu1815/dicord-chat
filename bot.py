@@ -1,5 +1,6 @@
 import logging
 import os
+from pathlib import Path
 
 import aiosqlite
 import discord
@@ -8,16 +9,12 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-missing = [k for k in ("DISCORD_TOKEN", "LLM_API_KEY", "LLM_MODEL") if not os.getenv(k)]
-if missing:
-    raise SystemExit(f"Missing required environment variables: {', '.join(missing)}\nPlease set them in your .env file.")
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("discord_bot")
 
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("discord_bot")
 
 
 class DiscordBot(commands.Bot):
@@ -64,10 +61,18 @@ class DiscordBot(commands.Bot):
             self.logger.warning("LLM not configured, /manage command will not work: %s", e)
             self.main_agent = None
 
-        for file in os.listdir("cogs"):
-            if file.endswith(".py"):
-                await self.load_extension(f"cogs.{file[:-3]}")
-                self.logger.info(f"Loaded extension '{file[:-3]}'")
+        cogs_dir = Path(__file__).resolve().parent / "cogs"
+        if not cogs_dir.is_dir():
+            self.logger.warning("cogs directory not found at %s", cogs_dir)
+        else:
+            for file in sorted(cogs_dir.iterdir()):
+                if file.suffix == ".py" and file.name != "__init__.py":
+                    ext_name = f"cogs.{file.stem}"
+                    try:
+                        await self.load_extension(ext_name)
+                        self.logger.info("Loaded extension '%s'", file.stem)
+                    except Exception as e:
+                        self.logger.error("Failed to load extension '%s': %s", file.stem, e)
 
     async def _init_database(self) -> None:
         """SQLiteデータベースを初期化し、必要なテーブルを作成する。"""
@@ -78,9 +83,17 @@ class DiscordBot(commands.Bot):
                     id TEXT PRIMARY KEY,
                     approved INTEGER NOT NULL,
                     user_id INTEGER NOT NULL,
-                    created_at TEXT NOT NULL
+                    created_at TEXT NOT NULL,
+                    todos_hash TEXT
                 )
             """)
+            # Add todos_hash column if it does not exist (idempotent migration).
+            cursor = await db.execute("PRAGMA table_info(approvals)")
+            columns = {row[1] for row in await cursor.fetchall()}
+            if "todos_hash" not in columns:
+                await db.execute(
+                    "ALTER TABLE approvals ADD COLUMN todos_hash TEXT",
+                )
             await db.commit()
         self.logger.info("Database initialized: %s", db_path)
 
@@ -91,5 +104,21 @@ class DiscordBot(commands.Bot):
         await self.process_commands(message)
 
 
-bot = DiscordBot()
-bot.run(os.getenv("DISCORD_TOKEN"))
+def main() -> None:
+    """エントリーポイント。環境変数チェック後にボットを起動する。"""
+    missing = [
+        k for k in ("DISCORD_TOKEN", "LLM_API_KEY", "LLM_MODEL")
+        if not os.getenv(k)
+    ]
+    if missing:
+        raise SystemExit(
+            f"Missing required environment variables: {', '.join(missing)}\n"
+            "Please set them in your .env file."
+        )
+
+    bot = DiscordBot()
+    bot.run(os.getenv("DISCORD_TOKEN"))
+
+
+if __name__ == "__main__":
+    main()

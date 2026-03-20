@@ -5,8 +5,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from agents.main_agent import (
     MainAgent,
     _validate_planner_decision,
-    INVESTIGATION_TARGETS,
+)
+from agents.registry import (
     EXECUTION_TARGETS,
+    INVESTIGATION_TARGETS,
 )
 from graph.state import AgentState
 

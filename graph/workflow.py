@@ -3,11 +3,24 @@ from typing import Any
 
 from langgraph.graph import END, StateGraph
 
+from agents.registry import get_single_action_agents, load_agent_module
 from graph.state import AgentState
 
 logger = logging.getLogger("discord_bot")
 
 DEFAULT_MAX_PLANNING_ITERATIONS = 5
+
+# Derived from agent-declared single_action capability.
+_SINGLE_ACTION_EXECUTION_AGENTS = get_single_action_agents()
+
+# Keys from agent return state that are safe to merge back into the
+# workflow state.  Approval-related keys are excluded so that the
+# frozen approval semantics are never accidentally overwritten.
+_MERGEABLE_STATE_KEYS = frozenset({
+    "investigation_results",
+    "execution_results",
+    "investigation_summary",
+})
 
 
 def build_pre_approval_workflow() -> StateGraph:
@@ -87,6 +100,25 @@ def build_pre_approval_workflow() -> StateGraph:
             execution_todos = planner.build_execution_todos(
                 decision["execution_candidates"],
             )
+            if not execution_todos:
+                # Planner said ready but all candidates were filtered out
+                # (e.g. invalid agent names). Fail closed instead of silently
+                # falling through to done_no_execution.
+                return {
+                    "planner_decision": decision,
+                    "planning_iteration": iteration,
+                    "planning_history": history,
+                    "draft_todos": new_draft,
+                    "pending_investigation_todos": [],
+                    "plan_status": "error",
+                    "approval_required": False,
+                    "approval_summary": decision.get("summary", ""),
+                    "error": (
+                        "Planner returned ready_for_approval but all execution "
+                        "candidates were invalid and filtered out. Refusing to "
+                        "proceed silently."
+                    ),
+                }
             if decision["replace_todos"]:
                 new_draft = execution_todos
             else:
@@ -126,8 +158,6 @@ def build_pre_approval_workflow() -> StateGraph:
 
     async def run_investigations(state: AgentState) -> dict[str, Any]:
         """調査エージェントを実行する。"""
-        from cogs.agent_cog import _load_agent_module
-
         investigation_todos = state.get("pending_investigation_todos", [])
 
         if not investigation_todos:
@@ -141,15 +171,23 @@ def build_pre_approval_workflow() -> StateGraph:
             guild = bot.get_guild(state.get("guild_id")) if bot else None
 
             results: dict[str, Any] = {}
+            completed: list[str] = []
+            extra_state: dict[str, Any] = {}
             for todo in investigation_todos:
                 agent_name = todo.get("agent", "")
                 target = agent_name.replace("_investigation", "")
-                agent = _load_agent_module(target, "investigation")
+                agent = load_agent_module(target, "investigation")
                 if not agent:
+                    logger.warning(
+                        "Investigation agent %s not available", agent_name,
+                    )
+                    results[agent_name] = {
+                        "error": f"Agent {agent_name} not available",
+                    }
                     continue
                 if not guild:
                     logger.warning("Guild %s not found for investigation %s", state.get("guild_id"), agent_name)
-                    results[agent.name] = {"error": "Guild not found"}
+                    results[agent_name] = {"error": "Guild not found"}
                     continue
                 try:
                     new_state = await agent.run(investigation_state, guild)
@@ -157,18 +195,24 @@ def build_pre_approval_workflow() -> StateGraph:
                     results[key] = new_state.get(
                         "investigation_results", {},
                     ).get(agent.name, {})
+                    # Preserve safe non-result state updates from the
+                    # agent return so downstream nodes can see them.
+                    for merge_key in _MERGEABLE_STATE_KEYS:
+                        if merge_key in new_state and merge_key != "investigation_results":
+                            extra_state.setdefault(merge_key, new_state[merge_key])
+                    if key not in completed:
+                        completed.append(key)
                 except Exception as e:
                     logger.error("Investigation agent %s failed: %s", agent_name, e)
-                    results[agent.name] = {"error": str(e)}
+                    results[agent_name] = {"error": str(e)}
 
             merged_results = dict(state.get("investigation_results", {}))
             merged_results.update(results)
 
-            completed = list(state.get("completed_investigation_agents", []))
-            for todo in investigation_todos:
-                agent_name = todo.get("agent", "")
-                if agent_name not in completed:
-                    completed.append(agent_name)
+            new_completed = list(state.get("completed_investigation_agents", []))
+            for c in completed:
+                if c not in new_completed:
+                    new_completed.append(c)
 
             summary_parts = []
             for key, value in results.items():
@@ -177,10 +221,11 @@ def build_pre_approval_workflow() -> StateGraph:
 
             return {
                 "investigation_results": merged_results,
-                "completed_investigation_agents": completed,
+                "completed_investigation_agents": new_completed,
                 "investigation_summary": "\n".join(summary_parts),
                 "pending_investigation_todos": [],
                 "plan_status": "planning",
+                **extra_state,
             }
         except Exception as e:
             logger.error("Failed to run investigations: %s", e)
@@ -196,9 +241,54 @@ def build_pre_approval_workflow() -> StateGraph:
         """承認用にタスクを凍結する。"""
         draft_todos = list(state.get("draft_todos", []))
 
+        # Only execution todos are actionable; investigation-only drafts
+        # should not enter approval.
+        execution_drafts = [
+            t for t in draft_todos if "investigation" not in t.get("agent", "")
+        ]
+
+        if not execution_drafts:
+            return {
+                "proposed_todos": [],
+                "todos": [],
+                "plan_status": "done_no_execution",
+                "approval_required": False,
+                "approval_status": "none",
+                "approval_summary": state.get("approval_summary", ""),
+            }
+
+        # Fail closed: single-action agents can only process one todo.
+        # If the planner proposed multiple todos for any of them, we must
+        # reject the plan rather than silently dropping actions.
+        from collections import Counter
+        agent_counts = Counter(t.get("agent", "") for t in execution_drafts)
+        multi = {
+            name for name, count in agent_counts.items()
+            if count > 1 and name in _SINGLE_ACTION_EXECUTION_AGENTS
+        }
+        if multi:
+            agents_str = ", ".join(sorted(multi))
+            logger.error(
+                "Refusing to approve: single-action agents with multiple todos: %s",
+                agents_str,
+            )
+            return {
+                "proposed_todos": [],
+                "todos": [],
+                "plan_status": "error",
+                "approval_required": False,
+                "approval_status": "none",
+                "error": (
+                    f"Single-action execution agent(s) {agents_str} received "
+                    "multiple proposed todos but can only process one each. "
+                    "The planner must produce at most one todo per single-action "
+                    "agent per cycle."
+                ),
+            }
+
         return {
-            "proposed_todos": draft_todos,
-            "todos": draft_todos,
+            "proposed_todos": execution_drafts,
+            "todos": execution_drafts,
             "todos_version": state.get("todos_version", 0) + 1,
             "approval_status": "pending",
             "plan_status": "ready_for_approval",
@@ -270,7 +360,17 @@ def build_pre_approval_workflow() -> StateGraph:
         "finalize_error": "finalize_error",
     })
 
-    workflow.add_edge("prepare_approval", END)
+    def after_approval(state: AgentState) -> str:
+        plan_status = state.get("plan_status", "")
+        if plan_status == "done_no_execution":
+            return "finalize_no_execution"
+        return END
+
+    workflow.add_conditional_edges("prepare_approval", after_approval, {
+        "finalize_no_execution": "finalize_no_execution",
+        "__end__": END,
+    })
+
     workflow.add_edge("finalize_no_execution", END)
     workflow.add_edge("finalize_error", END)
 
@@ -299,8 +399,6 @@ def build_post_approval_workflow() -> StateGraph:
 
     async def run_execution(state: AgentState) -> dict[str, Any]:
         """実行エージェントを実行する。"""
-        from cogs.agent_cog import _load_agent_module
-
         proposed_todos = state.get("proposed_todos", [])
         execution_todos = [
             t for t in proposed_todos if "investigation" not in t.get("agent", "")
@@ -318,11 +416,17 @@ def build_post_approval_workflow() -> StateGraph:
             guild = bot.get_guild(state.get("guild_id")) if bot else None
 
             results: dict[str, Any] = {}
+            seen_agents: set[str] = set()
+            extra_state: dict[str, Any] = {}
             for todo in execution_todos:
                 agent_name = todo.get("agent", "")
+                if agent_name in seen_agents:
+                    continue
+                seen_agents.add(agent_name)
                 target = agent_name.replace("_execution", "")
-                agent = _load_agent_module(target, "execution")
+                agent = load_agent_module(target, "execution")
                 if not agent:
+                    results[agent_name] = {"error": f"Agent {agent_name} not available"}
                     continue
                 if not guild:
                     logger.warning("Guild %s not found for execution %s", state.get("guild_id"), agent_name)
@@ -334,9 +438,14 @@ def build_post_approval_workflow() -> StateGraph:
                     results[key] = new_state.get(
                         "execution_results", {},
                     ).get(agent.name, {})
+                    # Preserve safe non-result state updates from the
+                    # agent return so downstream nodes can see them.
+                    for merge_key in _MERGEABLE_STATE_KEYS:
+                        if merge_key in new_state and merge_key != "execution_results":
+                            extra_state.setdefault(merge_key, new_state[merge_key])
                 except Exception as e:
                     logger.error("Execution agent %s failed: %s", agent_name, e)
-                    results[agent.name] = {"error": str(e)}
+                    results[agent_name] = {"error": str(e)}
 
             merged_results = dict(state.get("execution_results", {}))
             merged_results.update(results)
@@ -344,6 +453,7 @@ def build_post_approval_workflow() -> StateGraph:
             return {
                 "execution_results": merged_results,
                 "plan_status": "completed",
+                **extra_state,
             }
         except Exception as e:
             logger.error("Failed to run executions: %s", e)

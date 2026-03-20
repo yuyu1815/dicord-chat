@@ -85,7 +85,7 @@ async def test_pre_approval_need_investigation_then_ready():
     bot.get_guild = MagicMock(return_value=MagicMock(id=123456789))
     bot.main_agent = planner
 
-    with patch("cogs.agent_cog._load_agent_module") as mock_load:
+    with patch("graph.workflow.load_agent_module") as mock_load:
         mock_agent = MagicMock()
         mock_agent.name = "channel_investigation"
         mock_agent.run = AsyncMock(return_value={
@@ -107,9 +107,10 @@ async def test_pre_approval_need_investigation_then_ready():
 
 
 @pytest.mark.asyncio
-async def test_pre_approval_max_iterations():
-    """max_planning_iterationsに達したら強制的にapprovalに進むこと。"""
+async def test_pre_approval_max_iterations_with_execution_todos():
+    """max_planning_iterationsに達し実行候補がある場合、approvalに進むこと。"""
     planner = MagicMock()
+    # Last iteration returns ready_for_approval so there are execution todos
     planner.plan_next_step = AsyncMock(side_effect=[
         {
             "status": "need_investigation",
@@ -118,14 +119,23 @@ async def test_pre_approval_max_iterations():
             "replace_todos": False,
             "summary": "Keep going",
         }
-    ] * (DEFAULT_MAX_PLANNING_ITERATIONS + 1))
+    ] * (DEFAULT_MAX_PLANNING_ITERATIONS - 1) + [
+        {
+            "status": "ready_for_approval",
+            "investigation_targets": [],
+            "execution_candidates": [{"agent": "channel_execution", "action": "create", "params": {"name": "test"}}],
+            "replace_todos": True,
+            "summary": "Ready",
+        },
+    ])
     planner.build_investigation_todos.return_value = [{"agent": "channel_investigation", "action": "investigate", "params": {}}]
+    planner.build_execution_todos.return_value = [{"agent": "channel_execution", "action": "create", "params": {"name": "test"}}]
 
     bot = MagicMock()
     bot.get_guild = MagicMock(return_value=MagicMock(id=123456789))
     bot.main_agent = planner
 
-    with patch("cogs.agent_cog._load_agent_module") as mock_load:
+    with patch("graph.workflow.load_agent_module") as mock_load:
         mock_agent = MagicMock()
         mock_agent.name = "channel_investigation"
         mock_agent.run = AsyncMock(return_value={
@@ -140,7 +150,49 @@ async def test_pre_approval_max_iterations():
         result = await app.ainvoke(_make_state(bot=bot))
 
     assert result.get("plan_status") == "ready_for_approval"
-    assert result.get("planning_iteration") == DEFAULT_MAX_PLANNING_ITERATIONS
+
+
+@pytest.mark.asyncio
+async def test_pre_approval_max_iterations_no_execution_todos():
+    """max_planning_iterationsに達し実行候補がない場合、done_no_executionになること。"""
+    planner = MagicMock()
+    # Planner always wants to investigate, never produces execution candidates
+    planner.plan_next_step = AsyncMock(side_effect=[
+        {
+            "status": "need_investigation",
+            "investigation_targets": ["channel"],
+            "execution_candidates": [],
+            "replace_todos": False,
+            "summary": "Keep going",
+        }
+        for _ in range(DEFAULT_MAX_PLANNING_ITERATIONS)
+    ])
+    # After first investigation completes, build_investigation_todos returns empty
+    # (target already completed), so draft_todos stays empty from iteration 2 onward.
+    planner.build_investigation_todos.side_effect = [
+        [{"agent": "channel_investigation", "action": "investigate", "params": {}}],
+    ] + [[] for _ in range(DEFAULT_MAX_PLANNING_ITERATIONS - 1)]
+
+    bot = MagicMock()
+    bot.get_guild = MagicMock(return_value=MagicMock(id=123456789))
+    bot.main_agent = planner
+
+    with patch("graph.workflow.load_agent_module") as mock_load:
+        mock_agent = MagicMock()
+        mock_agent.name = "channel_investigation"
+        mock_agent.run = AsyncMock(return_value={
+            "investigation_results": {
+                "channel_investigation": {},
+            },
+        })
+        mock_load.return_value = mock_agent
+
+        workflow = build_pre_approval_workflow()
+        app = workflow.compile()
+        result = await app.ainvoke(_make_state(bot=bot))
+
+    assert result.get("plan_status") == "done_no_execution"
+    assert result.get("approval_required") is False
 
 
 @pytest.mark.asyncio
@@ -240,7 +292,7 @@ async def test_pre_approval_no_duplicate_investigations():
         })
         return agent
 
-    with patch("cogs.agent_cog._load_agent_module", side_effect=mock_load):
+    with patch("graph.workflow.load_agent_module", side_effect=mock_load):
         workflow = build_pre_approval_workflow()
         app = workflow.compile()
         result = await app.ainvoke(_make_state(bot=bot))
@@ -276,7 +328,7 @@ async def test_pre_approval_draft_todos_replaced():
     bot.get_guild = MagicMock(return_value=MagicMock(id=123456789))
     bot.main_agent = planner
 
-    with patch("cogs.agent_cog._load_agent_module") as mock_load:
+    with patch("graph.workflow.load_agent_module") as mock_load:
         mock_agent = MagicMock()
         mock_agent.name = "channel_investigation"
         mock_agent.run = AsyncMock(return_value={
@@ -322,7 +374,7 @@ async def test_post_approval_approved_runs_execution():
         approved=True,
     )
 
-    with patch("cogs.agent_cog._load_agent_module") as mock_load:
+    with patch("graph.workflow.load_agent_module") as mock_load:
         mock_agent = MagicMock()
         mock_agent.name = "channel_execution"
         mock_agent.run = AsyncMock(return_value={
@@ -350,7 +402,7 @@ async def test_post_approval_rejected_no_execution():
         ],
     )
 
-    with patch("cogs.agent_cog._load_agent_module") as mock_load:
+    with patch("graph.workflow.load_agent_module") as mock_load:
         mock_load.return_value = MagicMock()
 
         workflow = build_post_approval_workflow()
@@ -393,7 +445,7 @@ async def test_post_approval_uses_frozen_proposed_todos():
         agent.run = run
         return agent
 
-    with patch("cogs.agent_cog._load_agent_module", side_effect=mock_load):
+    with patch("graph.workflow.load_agent_module", side_effect=mock_load):
         workflow = build_post_approval_workflow()
         app = workflow.compile()
         result = await app.ainvoke(state)
@@ -432,7 +484,7 @@ async def test_post_approval_execution_error():
         approved=True,
     )
 
-    with patch("cogs.agent_cog._load_agent_module") as mock_load:
+    with patch("graph.workflow.load_agent_module") as mock_load:
         mock_agent = MagicMock()
         mock_agent.name = "channel_execution"
         mock_agent.run = AsyncMock(side_effect=RuntimeError("Discord API error"))
@@ -625,3 +677,780 @@ def test_parse_json_invalid_raises():
     import pytest as _pytest
     with _pytest.raises(ValueError):
         _parse_json_from_llm("not json")
+
+
+# --- Fix 1: run_execution deduplicates agents per todo ---
+
+
+@pytest.mark.asyncio
+async def test_post_approval_execution_deduplicates_same_agent():
+    """同じ実行エージェントが複数todoで複数回呼ばれないこと。"""
+    state = _make_state(
+        approval_status="approved",
+        proposed_todos=[
+            {"agent": "channel_execution", "action": "create", "params": {"name": "a"}},
+            {"agent": "channel_execution", "action": "create", "params": {"name": "b"}},
+            {"agent": "channel_execution", "action": "delete", "params": {"name": "c"}},
+        ],
+        approved=True,
+    )
+
+    call_count = 0
+
+    with patch("graph.workflow.load_agent_module") as mock_load:
+        mock_agent = MagicMock()
+        mock_agent.name = "channel_execution"
+
+        async def fake_run(state, guild):
+            nonlocal call_count
+            call_count += 1
+            return {
+                "execution_results": {
+                    "channel_execution": {"success": True, "calls": call_count},
+                },
+            }
+
+        mock_agent.run = fake_run
+        mock_load.return_value = mock_agent
+
+        workflow = build_post_approval_workflow()
+        app = workflow.compile()
+        result = await app.ainvoke(state)
+
+    assert call_count == 1, f"Expected 1 call but got {call_count}"
+    assert result.get("plan_status") == "completed"
+
+
+@pytest.mark.asyncio
+async def test_post_approval_execution_different_agents_each_run_once():
+    """異なる実行エージェントがそれぞれ1回ずつ呼ばれること。"""
+    state = _make_state(
+        approval_status="approved",
+        proposed_todos=[
+            {"agent": "channel_execution", "action": "create", "params": {"name": "a"}},
+            {"agent": "role_execution", "action": "create", "params": {"name": "mod"}},
+        ],
+        approved=True,
+    )
+
+    call_log = []
+
+    def mock_load(target, kind):
+        agent = MagicMock()
+        agent.name = f"{target}_{kind}"
+
+        async def fake_run(state, guild):
+            call_log.append(agent.name)
+            return {"execution_results": {agent.name: {"success": True}}}
+
+        agent.run = fake_run
+        return agent
+
+    with patch("graph.workflow.load_agent_module", side_effect=mock_load):
+        workflow = build_post_approval_workflow()
+        app = workflow.compile()
+        result = await app.ainvoke(state)
+
+    assert call_log == ["channel_execution", "role_execution"]
+    assert result.get("plan_status") == "completed"
+
+
+# --- Fix 2: investigation failures are NOT marked completed ---
+
+
+@pytest.mark.asyncio
+async def test_pre_approval_failed_investigation_not_marked_completed():
+    """調査エージェントが失敗した場合、completed_investigation_agentsに追加されないこと。"""
+    planner = MagicMock()
+    planner.plan_next_step = AsyncMock(side_effect=[
+        {
+            "status": "need_investigation",
+            "investigation_targets": ["channel"],
+            "execution_candidates": [],
+            "replace_todos": False,
+            "summary": "Need channel info",
+        },
+        {
+            "status": "ready_for_approval",
+            "investigation_targets": [],
+            "execution_candidates": [{"agent": "channel_execution", "action": "create", "params": {"name": "test"}}],
+            "replace_todos": True,
+            "summary": "Ready",
+        },
+    ])
+    planner.build_investigation_todos.return_value = [
+        {"agent": "channel_investigation", "action": "investigate", "params": {}},
+    ]
+    planner.build_execution_todos.return_value = [
+        {"agent": "channel_execution", "action": "create", "params": {"name": "test"}},
+    ]
+
+    bot = MagicMock()
+    bot.get_guild = MagicMock(return_value=MagicMock(id=123456789))
+    bot.main_agent = planner
+
+    with patch("graph.workflow.load_agent_module") as mock_load:
+        mock_agent = MagicMock()
+        mock_agent.name = "channel_investigation"
+        mock_agent.run = AsyncMock(side_effect=RuntimeError("Agent crash"))
+        mock_load.return_value = mock_agent
+
+        workflow = build_pre_approval_workflow()
+        app = workflow.compile()
+        result = await app.ainvoke(_make_state(bot=bot))
+
+    completed = result.get("completed_investigation_agents", [])
+    assert "channel_investigation" not in completed
+    inv_results = result.get("investigation_results", {})
+    assert "error" in inv_results.get("channel_investigation", {})
+
+
+@pytest.mark.asyncio
+async def test_pre_approval_unavailable_investigation_not_marked_completed():
+    """調査エージェントが読み込み不可の場合、completedに追加されないこと。"""
+    planner = MagicMock()
+    planner.plan_next_step = AsyncMock(side_effect=[
+        {
+            "status": "need_investigation",
+            "investigation_targets": ["channel"],
+            "execution_candidates": [],
+            "replace_todos": False,
+            "summary": "Need channel info",
+        },
+        {
+            "status": "done_no_execution",
+            "investigation_targets": [],
+            "execution_candidates": [],
+            "replace_todos": False,
+            "summary": "Could not investigate",
+        },
+    ])
+    planner.build_investigation_todos.return_value = [
+        {"agent": "channel_investigation", "action": "investigate", "params": {}},
+    ]
+
+    bot = MagicMock()
+    bot.get_guild = MagicMock(return_value=MagicMock(id=123456789))
+    bot.main_agent = planner
+
+    with patch("graph.workflow.load_agent_module", return_value=None):
+        workflow = build_pre_approval_workflow()
+        app = workflow.compile()
+        result = await app.ainvoke(_make_state(bot=bot))
+
+    completed = result.get("completed_investigation_agents", [])
+    assert "channel_investigation" not in completed
+    inv_results = result.get("investigation_results", {})
+    assert "error" in inv_results.get("channel_investigation", {})
+
+
+@pytest.mark.asyncio
+async def test_pre_approval_successful_investigation_is_marked_completed():
+    """調査エージェントが成功した場合のみcompletedに追加されること。"""
+    planner = MagicMock()
+    planner.plan_next_step = AsyncMock(side_effect=[
+        {
+            "status": "need_investigation",
+            "investigation_targets": ["channel"],
+            "execution_candidates": [],
+            "replace_todos": False,
+            "summary": "Need channel info",
+        },
+        {
+            "status": "done_no_execution",
+            "investigation_targets": [],
+            "execution_candidates": [],
+            "replace_todos": False,
+            "summary": "Got it",
+        },
+    ])
+    planner.build_investigation_todos.return_value = [
+        {"agent": "channel_investigation", "action": "investigate", "params": {}},
+    ]
+
+    bot = MagicMock()
+    bot.get_guild = MagicMock(return_value=MagicMock(id=123456789))
+    bot.main_agent = planner
+
+    with patch("graph.workflow.load_agent_module") as mock_load:
+        mock_agent = MagicMock()
+        mock_agent.name = "channel_investigation"
+        mock_agent.run = AsyncMock(return_value={
+            "investigation_results": {"channel_investigation": {"total_count": 3}},
+        })
+        mock_load.return_value = mock_agent
+
+        workflow = build_pre_approval_workflow()
+        app = workflow.compile()
+        result = await app.ainvoke(_make_state(bot=bot))
+
+    completed = result.get("completed_investigation_agents", [])
+    assert "channel_investigation" in completed
+
+
+# --- Fix 3: empty approval todos routes to done_no_execution ---
+
+
+@pytest.mark.asyncio
+async def test_pre_approval_empty_todos_at_max_iterations():
+    """max_iterations到達時にdraft_todosが空ならdone_no_executionになること。"""
+    planner = MagicMock()
+    planner.plan_next_step = AsyncMock(side_effect=[
+        {
+            "status": "need_investigation",
+            "investigation_targets": ["channel"],
+            "execution_candidates": [],
+            "replace_todos": False,
+            "summary": "Keep going",
+        }
+        for _ in range(DEFAULT_MAX_PLANNING_ITERATIONS)
+    ])
+    # First iteration has investigation todos; subsequent ones are empty
+    # (simulating all targets already completed)
+    planner.build_investigation_todos.side_effect = [
+        [{"agent": "channel_investigation", "action": "investigate", "params": {}}],
+    ] + [[] for _ in range(DEFAULT_MAX_PLANNING_ITERATIONS - 1)]
+
+    bot = MagicMock()
+    bot.get_guild = MagicMock(return_value=MagicMock(id=123456789))
+    bot.main_agent = planner
+
+    with patch("graph.workflow.load_agent_module") as mock_load:
+        mock_agent = MagicMock()
+        mock_agent.name = "channel_investigation"
+        mock_agent.run = AsyncMock(return_value={
+            "investigation_results": {"channel_investigation": {}},
+        })
+        mock_load.return_value = mock_agent
+
+        workflow = build_pre_approval_workflow()
+        app = workflow.compile()
+        result = await app.ainvoke(_make_state(bot=bot))
+
+    assert result.get("plan_status") == "done_no_execution"
+    assert result.get("approval_required") is False
+
+
+# --- Fix: Invalid LLM execution candidates must not silently become done_no_execution ---
+
+
+@pytest.mark.asyncio
+async def test_pre_approval_ready_for_approval_all_candidates_filtered_becomes_error():
+    """plannerがready_for_approvalを返しても全候補がフィルタリングされた場合、エラーになること。"""
+    planner = MagicMock()
+    planner.plan_next_step = AsyncMock(return_value={
+        "status": "ready_for_approval",
+        "investigation_targets": [],
+        "execution_candidates": [
+            {"agent": "nonexistent_execution", "action": "create", "params": {}},
+        ],
+        "replace_todos": True,
+        "summary": "Should create something",
+    })
+    # build_execution_todos filters out nonexistent agent -> empty list
+    planner.build_execution_todos.return_value = []
+
+    bot = MagicMock()
+    bot.get_guild = MagicMock(return_value=MagicMock(id=123456789))
+    bot.main_agent = planner
+
+    workflow = build_pre_approval_workflow()
+    app = workflow.compile()
+    result = await app.ainvoke(_make_state(bot=bot))
+
+    assert result.get("plan_status") == "error"
+    assert result.get("approval_required") is False
+    assert "filtered out" in result.get("error", "")
+
+
+@pytest.mark.asyncio
+async def test_pre_approval_ready_for_approval_valid_candidates_succeeds():
+    """plannerが有効な候補を返した場合はready_for_approvalになること。"""
+    planner = MagicMock()
+    planner.plan_next_step = AsyncMock(return_value={
+        "status": "ready_for_approval",
+        "investigation_targets": [],
+        "execution_candidates": [
+            {"agent": "channel_execution", "action": "create", "params": {"name": "test"}},
+        ],
+        "replace_todos": True,
+        "summary": "Create channel",
+    })
+    planner.build_execution_todos.return_value = [
+        {"agent": "channel_execution", "action": "create", "params": {"name": "test"}},
+    ]
+
+    bot = MagicMock()
+    bot.get_guild = MagicMock(return_value=MagicMock(id=123456789))
+    bot.main_agent = planner
+
+    workflow = build_pre_approval_workflow()
+    app = workflow.compile()
+    result = await app.ainvoke(_make_state(bot=bot))
+
+    assert result.get("plan_status") == "ready_for_approval"
+    assert result.get("approval_required") is True
+
+
+# --- Fix: Non-result state updates from agents are preserved ---
+
+
+@pytest.mark.asyncio
+async def test_investigation_extra_state_fields_preserved():
+    """調査エージェントが返す非結果フィールドがワークフロー状態にマージされること。"""
+    planner = MagicMock()
+    planner.plan_next_step = AsyncMock(side_effect=[
+        {
+            "status": "need_investigation",
+            "investigation_targets": ["channel"],
+            "execution_candidates": [],
+            "replace_todos": False,
+            "summary": "Need info",
+        },
+        {
+            "status": "done_no_execution",
+            "investigation_targets": [],
+            "execution_candidates": [],
+            "replace_todos": False,
+            "summary": "Done",
+        },
+    ])
+    planner.build_investigation_todos.return_value = [
+        {"agent": "channel_investigation", "action": "investigate", "params": {}},
+    ]
+
+    bot = MagicMock()
+    bot.get_guild = MagicMock(return_value=MagicMock(id=123456789))
+    bot.main_agent = planner
+
+    with patch("graph.workflow.load_agent_module") as mock_load:
+        mock_agent = MagicMock()
+        mock_agent.name = "channel_investigation"
+        mock_agent.run = AsyncMock(return_value={
+            "investigation_results": {
+                "channel_investigation": {"total_count": 5},
+            },
+            "investigation_summary": "Agent-level summary: 5 channels found",
+        })
+        mock_load.return_value = mock_agent
+
+        workflow = build_pre_approval_workflow()
+        app = workflow.compile()
+        result = await app.ainvoke(_make_state(bot=bot))
+
+    # The investigation_summary from the agent should be merged into state.
+    assert result.get("investigation_summary") is not None
+    assert "channel_investigation" in result.get("investigation_results", {})
+
+
+@pytest.mark.asyncio
+async def test_execution_extra_state_fields_preserved():
+    """実行エージェントが返す非結果フィールドが最終状態にマージされること。"""
+    state = _make_state(
+        approval_status="approved",
+        proposed_todos=[
+            {"agent": "channel_execution", "action": "create", "params": {"name": "test"}},
+        ],
+        approved=True,
+    )
+
+    with patch("graph.workflow.load_agent_module") as mock_load:
+        mock_agent = MagicMock()
+        mock_agent.name = "channel_execution"
+        mock_agent.run = AsyncMock(return_value={
+            "execution_results": {
+                "channel_execution": {"success": True},
+            },
+            "investigation_summary": "Post-execution summary from agent",
+        })
+        mock_load.return_value = mock_agent
+
+        workflow = build_post_approval_workflow()
+        app = workflow.compile()
+        result = await app.ainvoke(state)
+
+    assert result.get("plan_status") == "completed"
+    # The extra investigation_summary from the execution agent should be merged
+    assert result.get("investigation_summary") == "Post-execution summary from agent"
+
+
+@pytest.mark.asyncio
+async def test_agent_return_approval_keys_not_merged():
+    """エージェントが返す承認関連キーがマージされないこと。"""
+    planner = MagicMock()
+    planner.plan_next_step = AsyncMock(side_effect=[
+        {
+            "status": "need_investigation",
+            "investigation_targets": ["channel"],
+            "execution_candidates": [],
+            "replace_todos": False,
+            "summary": "Need info",
+        },
+        {
+            "status": "done_no_execution",
+            "investigation_targets": [],
+            "execution_candidates": [],
+            "replace_todos": False,
+            "summary": "Done",
+        },
+    ])
+    planner.build_investigation_todos.return_value = [
+        {"agent": "channel_investigation", "action": "investigate", "params": {}},
+    ]
+
+    bot = MagicMock()
+    bot.get_guild = MagicMock(return_value=MagicMock(id=123456789))
+    bot.main_agent = planner
+
+    with patch("graph.workflow.load_agent_module") as mock_load:
+        mock_agent = MagicMock()
+        mock_agent.name = "channel_investigation"
+        # Agent returns approval_required=True but it must NOT be merged
+        mock_agent.run = AsyncMock(return_value={
+            "investigation_results": {
+                "channel_investigation": {"data": "ok"},
+            },
+            "approval_required": True,
+            "approval_status": "approved",
+            "plan_status": "executing",
+        })
+        mock_load.return_value = mock_agent
+
+        workflow = build_pre_approval_workflow()
+        app = workflow.compile()
+        result = await app.ainvoke(_make_state(bot=bot))
+
+    # Frozen approval keys must NOT be overwritten by agent returns
+    assert result.get("approval_required") is False
+    assert result.get("approval_status") == "none"
+    assert result.get("plan_status") == "done_no_execution"
+
+
+# --- Fix: Approval persistence with todos_hash verification ---
+
+
+from cogs.agent_cog import _compute_todos_hash, ApprovalView
+
+
+def test_compute_todos_hash_deterministic():
+    """同じtodos入力から同じハッシュが生成されること。"""
+    todos = [
+        {"agent": "channel_execution", "action": "create", "params": {"name": "test"}},
+    ]
+    h1 = _compute_todos_hash(todos)
+    h2 = _compute_todos_hash(todos)
+    assert h1 == h2
+    assert isinstance(h1, str)
+    assert len(h1) == 16
+
+
+def test_compute_todos_hash_differs_for_different_todos():
+    """異なるtodos入力から異なるハッシュが生成されること。"""
+    todos_a = [{"agent": "channel_execution", "action": "create", "params": {"name": "a"}}]
+    todos_b = [{"agent": "channel_execution", "action": "create", "params": {"name": "b"}}]
+    assert _compute_todos_hash(todos_a) != _compute_todos_hash(todos_b)
+
+
+def test_compute_todos_hash_empty_list():
+    """空リストでもハッシュが生成されること。"""
+    h = _compute_todos_hash([])
+    assert isinstance(h, str)
+    assert len(h) == 16
+
+
+@pytest.mark.asyncio
+async def test_verify_approval_returns_false_when_no_record():
+    """DBに承認レコードがない場合、_verify_approvalがFalseを返すこと。"""
+    bot = MagicMock()
+    bot.config = {"database_url": "sqlite:///database/test_verify_none.db"}
+    view = ApprovalView.__new__(ApprovalView)
+    view.bot = bot
+    view.approval_id = "nonexistent-id"
+    view.state = {"proposed_todos": []}
+
+    result = await view._verify_approval()
+    assert result is False
+
+
+@pytest.mark.asyncio
+async def test_verify_approval_returns_false_on_hash_mismatch():
+    """ハッシュが一致しない場合、_verify_approvalがFalseを返すこと。"""
+    import tempfile
+    import os
+
+    db_fd, db_path = tempfile.mkstemp(suffix=".db")
+    os.close(db_fd)
+    try:
+        bot = MagicMock()
+        bot.config = {"database_url": f"sqlite:///{db_path}"}
+        approval_id = "test-mismatch-id"
+
+        original_todos = [{"agent": "channel_execution", "action": "create", "params": {"name": "original"}}]
+        original_hash = _compute_todos_hash(original_todos)
+
+        import aiosqlite
+        async with aiosqlite.connect(db_path) as db:
+            await db.execute(
+                "CREATE TABLE IF NOT EXISTS approvals (id TEXT PRIMARY KEY, approved INTEGER NOT NULL, user_id INTEGER NOT NULL, created_at TEXT NOT NULL, todos_hash TEXT)",
+            )
+            await db.execute(
+                "INSERT INTO approvals (id, approved, user_id, created_at, todos_hash) VALUES (?, ?, ?, datetime('now'), ?)",
+                (approval_id, 1, 1001, original_hash),
+            )
+            await db.commit()
+
+        view = ApprovalView.__new__(ApprovalView)
+        view.bot = bot
+        view.approval_id = approval_id
+        view.state = {
+            "proposed_todos": [{"agent": "role_execution", "action": "create", "params": {"name": "tampered"}}],
+        }
+
+        result = await view._verify_approval()
+        assert result is False
+    finally:
+        os.unlink(db_path)
+
+
+@pytest.mark.asyncio
+async def test_verify_approval_returns_true_on_match():
+    """ハッシュが一致する場合、_verify_approvalがTrueを返すこと。"""
+    import tempfile
+    import os
+
+    db_fd, db_path = tempfile.mkstemp(suffix=".db")
+    os.close(db_fd)
+    try:
+        bot = MagicMock()
+        bot.config = {"database_url": f"sqlite:///{db_path}"}
+        approval_id = "test-match-id"
+
+        todos = [{"agent": "channel_execution", "action": "create", "params": {"name": "ok"}}]
+        todos_hash = _compute_todos_hash(todos)
+
+        import aiosqlite
+        async with aiosqlite.connect(db_path) as db:
+            await db.execute(
+                "CREATE TABLE IF NOT EXISTS approvals (id TEXT PRIMARY KEY, approved INTEGER NOT NULL, user_id INTEGER NOT NULL, created_at TEXT NOT NULL, todos_hash TEXT)",
+            )
+            await db.execute(
+                "INSERT INTO approvals (id, approved, user_id, created_at, todos_hash) VALUES (?, ?, ?, datetime('now'), ?)",
+                (approval_id, 1, 1001, todos_hash),
+            )
+            await db.commit()
+
+        view = ApprovalView.__new__(ApprovalView)
+        view.bot = bot
+        view.approval_id = approval_id
+        view.state = {"proposed_todos": todos}
+
+        result = await view._verify_approval()
+        assert result is True
+    finally:
+        os.unlink(db_path)
+
+
+@pytest.mark.asyncio
+async def test_verify_approval_returns_false_when_not_approved():
+    """DBでapproved=0の場合、_verify_approvalがFalseを返すこと。"""
+    import tempfile
+    import os
+
+    db_fd, db_path = tempfile.mkstemp(suffix=".db")
+    os.close(db_fd)
+    try:
+        bot = MagicMock()
+        bot.config = {"database_url": f"sqlite:///{db_path}"}
+        approval_id = "test-rejected-id"
+
+        todos = [{"agent": "channel_execution", "action": "create", "params": {"name": "x"}}]
+        todos_hash = _compute_todos_hash(todos)
+
+        import aiosqlite
+        async with aiosqlite.connect(db_path) as db:
+            await db.execute(
+                "CREATE TABLE IF NOT EXISTS approvals (id TEXT PRIMARY KEY, approved INTEGER NOT NULL, user_id INTEGER NOT NULL, created_at TEXT NOT NULL, todos_hash TEXT)",
+            )
+            await db.execute(
+                "INSERT INTO approvals (id, approved, user_id, created_at, todos_hash) VALUES (?, ?, ?, datetime('now'), ?)",
+                (approval_id, 0, 1001, todos_hash),
+            )
+            await db.commit()
+
+        view = ApprovalView.__new__(ApprovalView)
+        view.bot = bot
+        view.approval_id = approval_id
+        view.state = {"proposed_todos": todos}
+
+        result = await view._verify_approval()
+        assert result is False
+    finally:
+        os.unlink(db_path)
+
+
+# --- Fix: single-action execution agents rejected when proposed multiple todos ---
+
+
+@pytest.mark.asyncio
+async def test_pre_approval_single_action_agent_multiple_todos_rejected():
+    """single-actionエージェントに複数todoが提案された場合、エラーになること。"""
+    planner = MagicMock()
+    planner.plan_next_step = AsyncMock(return_value={
+        "status": "ready_for_approval",
+        "investigation_targets": [],
+        "execution_candidates": [
+            {"agent": "emoji_execution", "action": "create", "params": {"name": "a"}},
+            {"agent": "emoji_execution", "action": "delete", "params": {"name": "b"}},
+        ],
+        "replace_todos": True,
+        "summary": "Manage emojis",
+    })
+    planner.build_execution_todos.return_value = [
+        {"agent": "emoji_execution", "action": "create", "params": {"name": "a"}},
+        {"agent": "emoji_execution", "action": "delete", "params": {"name": "b"}},
+    ]
+
+    bot = MagicMock()
+    bot.get_guild = MagicMock(return_value=MagicMock(id=123456789))
+    bot.main_agent = planner
+
+    workflow = build_pre_approval_workflow()
+    app = workflow.compile()
+    result = await app.ainvoke(_make_state(bot=bot))
+
+    assert result.get("plan_status") == "error"
+    assert result.get("approval_required") is False
+    assert "single-action" in result.get("error", "").lower()
+    assert "emoji_execution" in result.get("error", "")
+
+
+@pytest.mark.asyncio
+async def test_pre_approval_multiple_single_action_agents_each_multi_rejected():
+    """複数のsingle-actionエージェントがそれぞれ複数todoを持つ場合、全てリジェクトされること。"""
+    planner = MagicMock()
+    planner.plan_next_step = AsyncMock(return_value={
+        "status": "ready_for_approval",
+        "investigation_targets": [],
+        "execution_candidates": [
+            {"agent": "emoji_execution", "action": "create", "params": {"name": "a"}},
+            {"agent": "emoji_execution", "action": "create", "params": {"name": "b"}},
+            {"agent": "sticker_execution", "action": "create", "params": {"name": "c"}},
+            {"agent": "sticker_execution", "action": "create", "params": {"name": "d"}},
+        ],
+        "replace_todos": True,
+        "summary": "Create stuff",
+    })
+    planner.build_execution_todos.return_value = [
+        {"agent": "emoji_execution", "action": "create", "params": {"name": "a"}},
+        {"agent": "emoji_execution", "action": "create", "params": {"name": "b"}},
+        {"agent": "sticker_execution", "action": "create", "params": {"name": "c"}},
+        {"agent": "sticker_execution", "action": "create", "params": {"name": "d"}},
+    ]
+
+    bot = MagicMock()
+    bot.get_guild = MagicMock(return_value=MagicMock(id=123456789))
+    bot.main_agent = planner
+
+    workflow = build_pre_approval_workflow()
+    app = workflow.compile()
+    result = await app.ainvoke(_make_state(bot=bot))
+
+    assert result.get("plan_status") == "error"
+    error = result.get("error", "")
+    assert "emoji_execution" in error
+    assert "sticker_execution" in error
+
+
+@pytest.mark.asyncio
+async def test_pre_approval_multi_action_agent_multiple_todos_allowed():
+    """multi-actionエージェント（channel_execution等）に複数todoがあっても許可されること。"""
+    planner = MagicMock()
+    planner.plan_next_step = AsyncMock(return_value={
+        "status": "ready_for_approval",
+        "investigation_targets": [],
+        "execution_candidates": [
+            {"agent": "channel_execution", "action": "create", "params": {"name": "a"}},
+            {"agent": "channel_execution", "action": "delete", "params": {"name": "b"}},
+        ],
+        "replace_todos": True,
+        "summary": "Manage channels",
+    })
+    planner.build_execution_todos.return_value = [
+        {"agent": "channel_execution", "action": "create", "params": {"name": "a"}},
+        {"agent": "channel_execution", "action": "delete", "params": {"name": "b"}},
+    ]
+
+    bot = MagicMock()
+    bot.get_guild = MagicMock(return_value=MagicMock(id=123456789))
+    bot.main_agent = planner
+
+    workflow = build_pre_approval_workflow()
+    app = workflow.compile()
+    result = await app.ainvoke(_make_state(bot=bot))
+
+    assert result.get("plan_status") == "ready_for_approval"
+    assert result.get("approval_required") is True
+
+
+@pytest.mark.asyncio
+async def test_pre_approval_single_action_agent_single_todo_allowed():
+    """single-actionエージェントにtodoが1つだけの場合は許可されること。"""
+    planner = MagicMock()
+    planner.plan_next_step = AsyncMock(return_value={
+        "status": "ready_for_approval",
+        "investigation_targets": [],
+        "execution_candidates": [
+            {"agent": "emoji_execution", "action": "create", "params": {"name": "party"}},
+        ],
+        "replace_todos": True,
+        "summary": "Create emoji",
+    })
+    planner.build_execution_todos.return_value = [
+        {"agent": "emoji_execution", "action": "create", "params": {"name": "party"}},
+    ]
+
+    bot = MagicMock()
+    bot.get_guild = MagicMock(return_value=MagicMock(id=123456789))
+    bot.main_agent = planner
+
+    workflow = build_pre_approval_workflow()
+    app = workflow.compile()
+    result = await app.ainvoke(_make_state(bot=bot))
+
+    assert result.get("plan_status") == "ready_for_approval"
+    assert result.get("approval_required") is True
+
+
+@pytest.mark.asyncio
+async def test_pre_approval_all_single_action_agents_tested():
+    """_SINGLE_ACTION_EXECUTION_AGENTSに含まれる全エージェントが拒否されること。"""
+    from graph.workflow import _SINGLE_ACTION_EXECUTION_AGENTS
+
+    for agent_name in _SINGLE_ACTION_EXECUTION_AGENTS:
+        planner = MagicMock()
+        planner.plan_next_step = AsyncMock(return_value={
+            "status": "ready_for_approval",
+            "investigation_targets": [],
+            "execution_candidates": [
+                {"agent": agent_name, "action": "create", "params": {"name": "a"}},
+                {"agent": agent_name, "action": "delete", "params": {"name": "b"}},
+            ],
+            "replace_todos": True,
+            "summary": "Test",
+        })
+        planner.build_execution_todos.return_value = [
+            {"agent": agent_name, "action": "create", "params": {"name": "a"}},
+            {"agent": agent_name, "action": "delete", "params": {"name": "b"}},
+        ]
+
+        bot = MagicMock()
+        bot.get_guild = MagicMock(return_value=MagicMock(id=123456789))
+        bot.main_agent = planner
+
+        workflow = build_pre_approval_workflow()
+        app = workflow.compile()
+        result = await app.ainvoke(_make_state(bot=bot))
+
+        assert result.get("plan_status") == "error", (
+            f"Agent {agent_name} with 2 todos should have been rejected"
+        )

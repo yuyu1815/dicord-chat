@@ -1,7 +1,7 @@
 import discord
 from discord import HTTPException
 
-from agents.base import ExecutionAgent
+from agents.base import ExecutionAgent, _find_action
 from graph.state import AgentState
 
 NAME = "webhook_execution"
@@ -15,6 +15,8 @@ ACTION_HANDLERS: dict[str, str] = {
 
 
 class WebhookExecutionAgent(ExecutionAgent):
+    single_action: bool = True
+
     ACTION_PERMISSIONS: dict[str, list[str]] = {
         "create": ["manage_webhooks"],
         "edit": ["manage_webhooks"],
@@ -27,7 +29,7 @@ class WebhookExecutionAgent(ExecutionAgent):
         return NAME
 
     async def execute(self, state: AgentState, guild: discord.Guild) -> dict:
-        action_name = self._find_action(state)
+        action_name = _find_action(state, NAME)
         if not action_name:
             return {"success": False, "action": "none", "details": "No matching todo found."}
 
@@ -48,12 +50,6 @@ class WebhookExecutionAgent(ExecutionAgent):
             return {"success": False, "action": action_name, "details": "Webhook or channel not found."}
         except HTTPException as exc:
             return {"success": False, "action": action_name, "details": f"API error: {exc.text}"}
-
-    def _find_action(self, state: AgentState) -> str | None:
-        for todo in state.get("todos", []):
-            if todo.get("agent") == NAME and not todo.get("_blocked"):
-                return todo.get("action")
-        return None
 
     async def _do_create(self, guild: discord.Guild, params: dict) -> dict:
         channel = guild.get_channel(params["channel_id"])

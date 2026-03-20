@@ -1,4 +1,6 @@
 import asyncio
+import hashlib
+import json
 import logging
 import uuid
 from typing import Any
@@ -8,6 +10,7 @@ import discord
 from discord.ext import commands
 
 from agents.base import BaseAgent, ExecutionAgent, InvestigationAgent
+from agents.registry import load_agent_module
 from graph.state import AgentState
 
 logger = logging.getLogger("discord_bot")
@@ -15,38 +18,21 @@ logger = logging.getLogger("discord_bot")
 APPROVAL_TIMEOUT = 300
 
 
-def _load_agent_module(target: str, kind: str) -> BaseAgent | None:
-    """エージェントモジュールを動的インポートし、クラスインスタンスを返す。
+def _compute_todos_hash(todos: list[dict[str, Any]]) -> str:
+    """承認対象タスクリストの整合性チェック用ハッシュを計算する。
 
     Args:
-        target: エージェントの対象名（例: ``"channel"``）。
-        kind: ``"investigation"`` または ``"execution"``。
+        todos: 凍結された実行タスクリスト。
 
     Returns:
-        エージェントインスタンス。読み込み失敗時は ``None``。
+        SHA-256 16進数ダイジェスト文字列（先頭16文字）。
     """
-    try:
-        if kind == "investigation":
-            module_path = f"agents.investigation.{target}"
-            class_suffix = "InvestigationAgent"
-        else:
-            module_path = f"agents.execution.{target}"
-            class_suffix = "ExecutionAgent"
+    payload = json.dumps(todos, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(payload.encode()).hexdigest()[:16]
 
-        module = __import__(module_path, fromlist=[None])
-        for attr in vars(module).values():
-            if (
-                isinstance(attr, type)
-                and attr.__name__.endswith(class_suffix)
-                and issubclass(attr, BaseAgent)
-                and attr is not BaseAgent
-                and attr is not InvestigationAgent
-                and attr is not ExecutionAgent
-            ):
-                return attr()
-    except (ImportError, AttributeError) as e:
-        logger.warning("Could not load agent %s/%s: %s", kind, target, e)
-    return None
+
+# Backward-compatible alias for existing tests and external references.
+_load_agent_module = load_agent_module
 
 
 class ApprovalView(discord.ui.View):
@@ -84,13 +70,51 @@ class ApprovalView(discord.ui.View):
 
     async def _save_approval(self, approved: bool) -> None:
         """承認結果をデータベースに保存する。"""
+        proposed_todos = self.state.get("proposed_todos", [])
+        todos_hash = _compute_todos_hash(proposed_todos)
         db_path = self.bot.config.get("database_url", "database/bot.db").replace("sqlite:///", "")
         async with aiosqlite.connect(db_path) as db:
             await db.execute(
-                "INSERT OR REPLACE INTO approvals (id, approved, user_id, created_at) VALUES (?, ?, ?, datetime('now'))",
-                (self.approval_id, approved, self.state["user_id"]),
+                "INSERT OR REPLACE INTO approvals (id, approved, user_id, created_at, todos_hash) VALUES (?, ?, ?, datetime('now'), ?)",
+                (self.approval_id, approved, self.state["user_id"], todos_hash),
             )
             await db.commit()
+
+    async def _verify_approval(self) -> bool:
+        """保存された承認レコードを現在のproposed_todosと照合する。
+
+        ハッシュが一致しない場合は改ざんの可能性があるためFalseを返す。
+        レコードが存在しない場合もFalseを返す。
+
+        Returns:
+            照合成功時は ``True``。
+        """
+        current_hash = _compute_todos_hash(self.state.get("proposed_todos", []))
+        db_path = self.bot.config.get("database_url", "database/bot.db").replace("sqlite:///", "")
+        try:
+            async with aiosqlite.connect(db_path) as db:
+                cursor = await db.execute(
+                    "SELECT approved, todos_hash FROM approvals WHERE id = ?",
+                    (self.approval_id,),
+                )
+                row = await cursor.fetchone()
+                if row is None:
+                    logger.error("Approval record %s not found in database", self.approval_id)
+                    return False
+                db_approved, db_hash = row
+                if not db_approved:
+                    logger.warning("Approval %s is not approved in database", self.approval_id)
+                    return False
+                if db_hash and db_hash != current_hash:
+                    logger.error(
+                        "Todos hash mismatch for approval %s: db=%s, current=%s",
+                        self.approval_id, db_hash, current_hash,
+                    )
+                    return False
+                return True
+        except Exception as e:
+            logger.error("Failed to verify approval %s: %s", self.approval_id, e)
+            return False
 
     async def _execute_approved(self) -> None:
         """承認後にpost-approvalワークフローを再開し、結果をチャンネルに送信する。"""
@@ -99,6 +123,16 @@ class ApprovalView(discord.ui.View):
         guild = self.bot.get_guild(self.state["guild_id"])
         if not guild:
             logger.error("Guild %s not found", self.state["guild_id"])
+            return
+
+        # Verify persisted approval record matches the current proposed_todos.
+        if not await self._verify_approval():
+            channel = guild.get_channel(self.state["channel_id"])
+            if channel and isinstance(channel, discord.TextChannel):
+                await channel.send(
+                    "Approval verification failed: proposed todos may have been "
+                    "tampered with. Execution aborted for safety.",
+                )
             return
 
         self.state["approved"] = True

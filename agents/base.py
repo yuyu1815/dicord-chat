@@ -4,6 +4,22 @@ from typing import Any
 from graph.state import AgentState
 
 
+def _find_action(state: AgentState, agent_name: str) -> str | None:
+    """単一アクションエージェント用のヘルパー。最初のマッチするtodoのアクション名を返す。
+
+    Args:
+        state: LangGraphワークフローの状態。
+        agent_name: エージェントの一意識別子。
+
+    Returns:
+        マッチするアクション名、なければ ``None``。
+    """
+    for todo in state.get("todos", []):
+        if todo.get("agent") == agent_name and not todo.get("_blocked"):
+            return todo.get("action")
+    return None
+
+
 class BaseAgent(ABC):
     """全エージェントの基底クラス。"""
 
@@ -49,9 +65,16 @@ class InvestigationAgent(BaseAgent):
 
 
 class ExecutionAgent(BaseAgent):
-    """書き込みエージェント。ユーザー承認後に変更操作を実行する。"""
+    """書き込みエージェント。ユーザー承認後に変更操作を実行する。
+
+    Attributes:
+        single_action: ``True`` の場合、このエージェントは実行時に
+            最初のマッチするtodoのみ処理する。プランナーは
+            このエージェントに対して todo を1つしか生成してはならない。
+    """
 
     ACTION_PERMISSIONS: dict[str, list[str]] = {}
+    single_action: bool = False
 
     async def run(self, state: AgentState, guild: Any) -> AgentState:
         if not state.get("approved"):
