@@ -3,7 +3,9 @@ import discord
 from agents.base import SingleActionExecutionAgent
 from graph.state import AgentState
 from i18n import t
-from services.attachment import AttachmentError, fetch_audio_bytes
+from services.attachment import AttachmentError, fetch_audio_bytes, fetch_url_bytes
+
+SOUNDBOARD_MAX_DURATION = 5.0
 
 NAME = "soundboard_execution"
 
@@ -37,6 +39,7 @@ class SoundboardExecutionAgent(SingleActionExecutionAgent):
     async def _do_create(self, guild: discord.Guild, params: dict) -> dict:
         sound = params.get("sound")
         message_id = params.get("message_id")
+        url = params.get("url")
 
         if message_id and not sound:
             channel_id = params.get("channel_id")
@@ -46,7 +49,17 @@ class SoundboardExecutionAgent(SingleActionExecutionAgent):
             if not channel or not isinstance(channel, (discord.TextChannel, discord.Thread)):
                 return {"success": False, "action": "create", "details": t("not_found.channel", locale=self._locale, id=channel_id)}
             try:
-                _, sound = await fetch_audio_bytes(channel, message_id, filename=params.get("filename"))
+                _, sound = await fetch_audio_bytes(
+                    channel, message_id, filename=params.get("filename"),
+                    max_duration=SOUNDBOARD_MAX_DURATION,
+                )
+            except AttachmentError as e:
+                return {"success": False, "action": "create", "details": str(e.reason)}
+
+        if sound is None and url:
+            try:
+                from services.attachment import fetch_url_audio_bytes
+                sound = await fetch_url_audio_bytes(url, max_duration=SOUNDBOARD_MAX_DURATION)
             except AttachmentError as e:
                 return {"success": False, "action": "create", "details": str(e.reason)}
 
