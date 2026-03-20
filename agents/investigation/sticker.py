@@ -5,11 +5,22 @@ from graph.state import AgentState
 
 
 class StickerInvestigationAgent(InvestigationAgent):
+    """カスタムスタンプを調査するエージェント。"""
+
     @property
     def name(self) -> str:
         return "sticker_investigation"
 
     async def investigate(self, state: AgentState, guild: discord.Guild) -> dict:
+        """全カスタムスタンプを収集する。
+
+        Args:
+            state: ワークフロー状態。
+            guild: 対象サーバー。
+
+        Returns:
+            スタンプ情報のリスト。
+        """
         if not guild.stickers:
             return {"stickers": []}
 

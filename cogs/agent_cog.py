@@ -17,7 +17,15 @@ APPROVAL_TIMEOUT = 300
 
 
 def _load_agent_module(target: str, kind: str) -> BaseAgent | None:
-    """Dynamically import an agent module and return its class instance."""
+    """エージェントモジュールを動的インポートし、クラスインスタンスを返す。
+
+    Args:
+        target: エージェントの対象名（例: ``"channel"``）。
+        kind: ``"investigation"`` または ``"execution"``。
+
+    Returns:
+        エージェントインスタンス。読み込み失敗時は ``None``。
+    """
     try:
         if kind == "investigation":
             module_path = f"agents.investigation.{target}"
@@ -43,7 +51,7 @@ def _load_agent_module(target: str, kind: str) -> BaseAgent | None:
 
 
 class ApprovalView(discord.ui.View):
-    """Discord UI for approval flow."""
+    """承認フローのDiscord UIビュー。"""
 
     def __init__(self, bot: commands.Bot, approval_id: str, state: AgentState) -> None:
         super().__init__(timeout=APPROVAL_TIMEOUT)
@@ -52,6 +60,7 @@ class ApprovalView(discord.ui.View):
         self.state = state
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        """リクエスト元ユーザーのみが承認/拒否できる。"""
         if interaction.user.id != self.state["user_id"]:
             await interaction.response.send_message("Only the requester can approve.", ephemeral=True)
             return False
@@ -59,6 +68,7 @@ class ApprovalView(discord.ui.View):
 
     @discord.ui.button(label="Approve", style=discord.ButtonStyle.green)
     async def approve(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        """承認ボタン。実行を開始する。"""
         self.approved = True
         await self._save_approval(True)
         await interaction.response.send_message("Executing...", ephemeral=True)
@@ -67,12 +77,14 @@ class ApprovalView(discord.ui.View):
 
     @discord.ui.button(label="Reject", style=discord.ButtonStyle.red)
     async def reject(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        """拒否ボタン。操作をキャンセルする。"""
         await self._save_approval(False)
         await interaction.response.send_message("Operation cancelled.", ephemeral=True)
         self.stop()
 
     async def _save_approval(self, approved: bool) -> None:
-        db_path = self.bot.config.get("database_url", "bot.db").replace("sqlite:///", "")
+        """承認結果をデータベースに保存する。"""
+        db_path = self.bot.config.get("database_url", "database/bot.db").replace("sqlite:///", "")
         async with aiosqlite.connect(db_path) as db:
             await db.execute(
                 "INSERT OR REPLACE INTO approvals (id, approved, user_id, created_at) VALUES (?, ?, ?, datetime('now'))",
@@ -81,6 +93,7 @@ class ApprovalView(discord.ui.View):
             await db.commit()
 
     async def _execute_approved(self) -> None:
+        """承認後に実行エージェントを実行し、結果をチャンネルに送信する。"""
         guild = self.bot.get_guild(self.state["guild_id"])
         if not guild:
             logger.error("Guild %s not found", self.state["guild_id"])
@@ -99,7 +112,7 @@ class ApprovalView(discord.ui.View):
 
 
 class AgentCog(commands.Cog):
-    """Main Cog: handles user requests and orchestrates agents."""
+    """ユーザーリクエストを処理し、エージェントをオーケストレーションするメインCog。"""
 
     def __init__(self, bot: commands.Bot, main_agent: MainAgent) -> None:
         self.bot = bot
@@ -107,7 +120,7 @@ class AgentCog(commands.Cog):
 
     @commands.hybrid_command(name="manage", description="Manage Discord server via AI agents")
     async def manage(self, ctx: commands.Context, *, request: str) -> None:
-        """Entry point: parse request, investigate, present execution candidates."""
+        """エントリーポイント。リクエストを解析し、調査→実行候補を提示する。"""
         if not ctx.guild:
             await ctx.send("This command requires a server context.")
             return
@@ -171,7 +184,17 @@ async def _run_agents(
     investigation_only: bool = False,
     execution_only: bool = False,
 ) -> dict[str, Any]:
-    """Run the appropriate agents based on todos."""
+    """タスクリストに基づいて該当エージェントを実行する。
+
+    Args:
+        state: ワークフロー状態。
+        guild: 対象サーバー。
+        investigation_only: 調査エージェントのみ実行。
+        execution_only: 実行エージェントのみ実行。
+
+    Returns:
+        エージェント名をキーとした結果の辞書。
+    """
     results: dict[str, Any] = {}
     todos = state.get("todos", [])
 
@@ -205,7 +228,15 @@ async def _run_agents(
 
 
 def _format_results(results: dict[str, Any], title: str) -> str:
-    """Format investigation/execution results for Discord."""
+    """調査/実行結果をDiscord向けにフォーマットする。
+
+    Args:
+        results: エージェントの実行結果。
+        title: セクションタイトル。
+
+    Returns:
+        フォーマットされた文字列。
+    """
     if not results:
         return ""
 
@@ -237,7 +268,14 @@ def _format_results(results: dict[str, Any], title: str) -> str:
 
 
 def _format_execution_candidates(todos: list[dict[str, Any]]) -> str:
-    """Format pending execution actions for user review."""
+    """ユーザー確認用の実行候補リストをフォーマットする。
+
+    Args:
+        todos: 全タスクリスト。
+
+    Returns:
+        フォーマットされた文字列。
+    """
     execution_todos = [t for t in todos if "investigation" not in t.get("agent", "")]
     if not execution_todos:
         return ""
@@ -254,7 +292,15 @@ def _format_execution_candidates(todos: list[dict[str, Any]]) -> str:
 
 
 def _split_message(text: str, max_length: int = 1900) -> list[str]:
-    """Split text into chunks that fit Discord's message limit."""
+    """Discordのメッセージ上限に合わせてテキストを分割する。
+
+    Args:
+        text: 分割対象の文字列。
+        max_length: チャンクの最大長。
+
+    Returns:
+        分割された文字列のリスト。
+    """
     if len(text) <= max_length:
         return [text]
     chunks = []
@@ -271,5 +317,4 @@ def _split_message(text: str, max_length: int = 1900) -> list[str]:
 
 
 async def setup(bot: commands.Bot) -> None:
-    main_agent = getattr(bot, "main_agent", None)
     await bot.add_cog(AgentCog(bot, main_agent))

@@ -5,7 +5,7 @@ from graph.state import AgentState
 
 
 class MessageExecutionAgent(ExecutionAgent):
-    """Handles message send, edit, delete, pin, and reaction operations."""
+    """メッセージの送信・編集・削除・ピン留め・リアクション操作を行うエージェント。"""
 
     ACTION_PERMISSIONS: dict[str, list[str]] = {
         "send": ["send_messages"],
@@ -24,6 +24,7 @@ class MessageExecutionAgent(ExecutionAgent):
         return "message_execution"
 
     async def execute(self, state: AgentState, guild: discord.Guild) -> dict:
+        """メッセージ関連の操作を実行する。"""
         todos = state.get("todos", [])
         my_todos = [t for t in todos if t.get("agent") == self.name and not t.get("_blocked")]
         if not my_todos:
@@ -58,6 +59,7 @@ class MessageExecutionAgent(ExecutionAgent):
         return await handler(params, guild)
 
     async def _send(self, params: dict, guild: discord.Guild) -> dict:
+        """メッセージを送信する。"""
         channel_id = params.get("channel_id")
         content = params.get("content", "")
         if not channel_id:
@@ -87,6 +89,7 @@ class MessageExecutionAgent(ExecutionAgent):
             return {"success": False, "action": "send", "details": str(e)}
 
     async def _edit(self, params: dict, guild: discord.Guild) -> dict:
+        """メッセージを編集する。"""
         message_id = params.get("message_id")
         content = params.get("content")
         if not message_id:
@@ -104,6 +107,7 @@ class MessageExecutionAgent(ExecutionAgent):
             return {"success": False, "action": "edit", "details": str(e)}
 
     async def _delete(self, params: dict, guild: discord.Guild) -> dict:
+        """メッセージを削除する。"""
         message_id = params.get("message_id")
         if not message_id:
             return {"success": False, "action": "delete", "details": "Missing 'message_id' parameter"}
@@ -118,6 +122,7 @@ class MessageExecutionAgent(ExecutionAgent):
             return {"success": False, "action": "delete", "details": str(e)}
 
     async def _pin(self, params: dict, guild: discord.Guild) -> dict:
+        """メッセージをピン留めする。"""
         channel_id = params.get("channel_id")
         message_id = params.get("message_id")
         if not channel_id or not message_id:
@@ -135,6 +140,7 @@ class MessageExecutionAgent(ExecutionAgent):
             return {"success": False, "action": "pin", "details": str(e)}
 
     async def _unpin(self, params: dict, guild: discord.Guild) -> dict:
+        """メッセージのピン留めを解除する。"""
         channel_id = params.get("channel_id")
         message_id = params.get("message_id")
         if not channel_id or not message_id:
@@ -152,6 +158,7 @@ class MessageExecutionAgent(ExecutionAgent):
             return {"success": False, "action": "unpin", "details": str(e)}
 
     async def _add_reaction(self, params: dict, guild: discord.Guild) -> dict:
+        """メッセージにリアクションを追加する。"""
         channel_id = params.get("channel_id")
         message_id = params.get("message_id")
         emoji = params.get("emoji")
@@ -170,6 +177,7 @@ class MessageExecutionAgent(ExecutionAgent):
             return {"success": False, "action": "add_reaction", "details": str(e)}
 
     async def _remove_reaction(self, params: dict, guild: discord.Guild) -> dict:
+        """メッセージのリアクションを削除する。"""
         channel_id = params.get("channel_id")
         message_id = params.get("message_id")
         emoji = params.get("emoji")
@@ -190,13 +198,13 @@ class MessageExecutionAgent(ExecutionAgent):
                 else:
                     return {"success": False, "action": "remove_reaction", "details": f"Member {member_id} not found"}
             else:
-                # Remove bot's own reaction
                 await message.remove_reaction(emoji, guild.me)
             return {"success": True, "action": "remove_reaction", "details": f"Removed reaction {emoji} from message {message_id}"}
         except (discord.Forbidden, discord.NotFound, discord.HTTPException) as e:
             return {"success": False, "action": "remove_reaction", "details": str(e)}
 
     async def _clear_reactions(self, params: dict, guild: discord.Guild) -> dict:
+        """メッセージの全リアクションを削除する。"""
         channel_id = params.get("channel_id")
         message_id = params.get("message_id")
         if not channel_id or not message_id:
@@ -214,6 +222,7 @@ class MessageExecutionAgent(ExecutionAgent):
             return {"success": False, "action": "clear_reactions", "details": str(e)}
 
     async def _bulk_delete(self, params: dict, guild: discord.Guild) -> dict:
+        """メッセージを一括削除する（14日以内）。"""
         channel_id = params.get("channel_id")
         message_ids = params.get("message_ids", [])
         if not channel_id or not message_ids:
@@ -224,14 +233,13 @@ class MessageExecutionAgent(ExecutionAgent):
             return {"success": False, "action": "bulk_delete", "details": f"Text channel {channel_id} not found"}
 
         try:
-            # Discord bulk_delete requires message objects or snowflakes (within 14 days)
             deleted = await channel.delete_messages(message_ids)
             return {"success": True, "action": "bulk_delete", "details": f"Bulk deleted {len(message_ids)} message(s) in #{channel.name}"}
         except (discord.Forbidden, discord.NotFound, discord.HTTPException) as e:
             return {"success": False, "action": "bulk_delete", "details": str(e)}
 
     async def _find_message(self, guild: discord.Guild, message_id: int) -> discord.Message | None:
-        """Search through guild channels for a message by ID."""
+        """サーバー内のチャンネル・スレッドからメッセージを検索する。"""
         for channel in guild.text_channels:
             try:
                 message = await channel.fetch_message(message_id)

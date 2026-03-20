@@ -7,6 +7,7 @@ KEY_PERMISSIONS = [
     "administrator",
     "manage_guild",
     "manage_channels",
+    "manage_roles",
     "kick_members",
     "ban_members",
     "mention_everyone",
@@ -15,11 +16,22 @@ KEY_PERMISSIONS = [
 
 
 class RoleInvestigationAgent(InvestigationAgent):
+    """ロール情報を調査するエージェント。"""
+
     @property
     def name(self) -> str:
         return "role_investigation"
 
     async def investigate(self, state: AgentState, guild: discord.Guild) -> dict:
+        """全ロールの権限・メンバー数を収集する。
+
+        Args:
+            state: ワークフロー状態。
+            guild: 対象サーバー。
+
+        Returns:
+            ロール情報のリストと総数。
+        """
         roles = []
         for role in guild.roles:
             perms = role.permissions

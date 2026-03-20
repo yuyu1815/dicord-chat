@@ -5,11 +5,22 @@ from graph.state import AgentState
 
 
 class VCInvestigationAgent(InvestigationAgent):
+    """ボイスチャンネルを調査するエージェント。"""
+
     @property
     def name(self) -> str:
         return "vc_investigation"
 
     async def investigate(self, state: AgentState, guild: discord.Guild) -> dict:
+        """全ボイスチャンネルと参加メンバーの状態を収集する。
+
+        Args:
+            state: ワークフロー状態。
+            guild: 対象サーバー。
+
+        Returns:
+            ボイスチャンネル情報のリストと総数。
+        """
         channels = []
         for vc in guild.voice_channels:
             current_members = [

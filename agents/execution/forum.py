@@ -5,7 +5,7 @@ from graph.state import AgentState
 
 
 class ForumExecutionAgent(ExecutionAgent):
-    """Handles forum channel operations: posts and tags."""
+    """フォーラムチャンネルの操作（投稿・タグ管理）を行うエージェント。"""
 
     ACTION_PERMISSIONS: dict[str, list[str]] = {
         "create_post": ["send_messages"],
@@ -21,6 +21,7 @@ class ForumExecutionAgent(ExecutionAgent):
         return "forum_execution"
 
     async def execute(self, state: AgentState, guild: discord.Guild) -> dict:
+        """フォーラム関連の操作を実行する。"""
         todos = state.get("todos", [])
         my_todos = [t for t in todos if t.get("agent") == self.name and not t.get("_blocked")]
         if not my_todos:
@@ -52,12 +53,14 @@ class ForumExecutionAgent(ExecutionAgent):
         return await handler(params, guild)
 
     async def _get_forum_channel(self, guild: discord.Guild, channel_id: int) -> discord.ForumChannel | None:
+        """チャンネルIDからフォーラムチャンネルを取得する。"""
         channel = guild.get_channel(channel_id)
         if isinstance(channel, discord.ForumChannel):
             return channel
         return None
 
     async def _create_post(self, params: dict, guild: discord.Guild) -> dict:
+        """フォーラムに投稿を作成する。"""
         forum_id = params.get("forum_channel_id")
         title = params.get("title")
         content = params.get("content", "")
@@ -70,7 +73,6 @@ class ForumExecutionAgent(ExecutionAgent):
         if not forum:
             return {"success": False, "action": "create_post", "details": f"Forum channel {forum_id} not found"}
 
-        # Resolve tags
         applied_tags = []
         tags_list = params.get("tags_list", [])
         available_tags = {t.id: t for t in forum.available_tags}
@@ -90,18 +92,16 @@ class ForumExecutionAgent(ExecutionAgent):
             return {"success": False, "action": "create_post", "details": str(e)}
 
     async def _edit_post(self, params: dict, guild: discord.Guild) -> dict:
+        """フォーラム投稿を編集する。"""
         message_id = params.get("message_id")
         if not message_id:
             return {"success": False, "action": "edit_post", "details": "Missing 'message_id' parameter"}
 
-        # The forum post is a thread; the message is the initial message in the thread
-        # We need to find the thread containing this message
         content = params.get("content")
         if not content:
             return {"success": False, "action": "edit_post", "details": "Missing 'content' parameter"}
 
         try:
-            # Fetch the message directly
             for channel in guild.text_channels:
                 if isinstance(channel, discord.ForumChannel):
                     for thread in channel.threads:
@@ -115,6 +115,7 @@ class ForumExecutionAgent(ExecutionAgent):
             return {"success": False, "action": "edit_post", "details": str(e)}
 
     async def _delete_post(self, params: dict, guild: discord.Guild) -> dict:
+        """フォーラム投稿を削除する。"""
         message_id = params.get("message_id")
         if not message_id:
             return {"success": False, "action": "delete_post", "details": "Missing 'message_id' parameter"}
@@ -133,6 +134,7 @@ class ForumExecutionAgent(ExecutionAgent):
             return {"success": False, "action": "delete_post", "details": str(e)}
 
     async def _create_tag(self, params: dict, guild: discord.Guild) -> dict:
+        """フォーラムにタグを作成する。"""
         forum_id = params.get("forum_channel_id")
         tag_name = params.get("name")
         if not forum_id:
@@ -153,6 +155,7 @@ class ForumExecutionAgent(ExecutionAgent):
             return {"success": False, "action": "create_tag", "details": str(e)}
 
     async def _edit_tag(self, params: dict, guild: discord.Guild) -> dict:
+        """フォーラムのタグを編集する。"""
         forum_id = params.get("forum_channel_id")
         tag_id = params.get("tag_id")
         if not forum_id:
@@ -184,6 +187,7 @@ class ForumExecutionAgent(ExecutionAgent):
             return {"success": False, "action": "edit_tag", "details": str(e)}
 
     async def _delete_tag(self, params: dict, guild: discord.Guild) -> dict:
+        """フォーラムのタグを削除する。"""
         forum_id = params.get("forum_channel_id")
         tag_id = params.get("tag_id")
         if not forum_id:

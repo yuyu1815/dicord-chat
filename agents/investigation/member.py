@@ -7,11 +7,22 @@ DEFAULT_MEMBER_LIMIT = 50
 
 
 class MemberInvestigationAgent(InvestigationAgent):
+    """メンバー情報を調査するエージェント。"""
+
     @property
     def name(self) -> str:
         return "member_investigation"
 
     async def investigate(self, state: AgentState, guild: discord.Guild) -> dict:
+        """メンバー情報を収集する。``user_id`` がある場合は個別、なければ一覧を取得する。
+
+        Args:
+            state: ワークフロー状態。
+            guild: 対象サーバー。
+
+        Returns:
+            メンバー情報の辞書。
+        """
         target_user_id = state.get("user_id")
 
         if target_user_id is not None:
@@ -20,6 +31,7 @@ class MemberInvestigationAgent(InvestigationAgent):
         return await self._member_list(guild)
 
     async def _single_member(self, guild: discord.Guild, user_id: int) -> dict:
+        """指定メンバーの詳細情報を取得する。"""
         member = guild.get_member(user_id)
 
         if member is None:
@@ -53,6 +65,7 @@ class MemberInvestigationAgent(InvestigationAgent):
         }
 
     async def _member_list(self, guild: discord.Guild) -> dict:
+        """メンバー一覧を取得する（上限 ``DEFAULT_MEMBER_LIMIT`` 件）。"""
         members = []
         async for member in guild.fetch_members(limit=DEFAULT_MEMBER_LIMIT):
             members.append({

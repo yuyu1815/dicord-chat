@@ -8,11 +8,22 @@ DEFAULT_FETCH_LIMIT = 20
 
 
 class MessageInvestigationAgent(InvestigationAgent):
+    """メッセージ情報を調査するエージェント。"""
+
     @property
     def name(self) -> str:
         return "message_investigation"
 
     async def investigate(self, state: AgentState, guild: discord.Guild) -> dict:
+        """指定チャンネルの直近メッセージを収集する。
+
+        Args:
+            state: ワークフロー状態（``channel_id`` が必要）。
+            guild: 対象サーバー。
+
+        Returns:
+            メッセージ情報のリストと取得件数。
+        """
         channel_id = state.get("channel_id")
         if channel_id is None:
             return {"error": "channel_id is required in state"}

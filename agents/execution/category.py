@@ -5,7 +5,7 @@ from graph.state import AgentState
 
 
 class CategoryExecutionAgent(ExecutionAgent):
-    """Handles category (channel group) operations."""
+    """カテゴリ（チャンネルグループ）の操作を行うエージェント。"""
 
     ACTION_PERMISSIONS: dict[str, list[str]] = {
         "create": ["manage_channels"],
@@ -18,6 +18,7 @@ class CategoryExecutionAgent(ExecutionAgent):
         return "category_execution"
 
     async def execute(self, state: AgentState, guild: discord.Guild) -> dict:
+        """カテゴリの作成・編集・削除を実行する。"""
         todos = state.get("todos", [])
         my_todos = [t for t in todos if t.get("agent") == self.name and not t.get("_blocked")]
         if not my_todos:
@@ -46,6 +47,7 @@ class CategoryExecutionAgent(ExecutionAgent):
         return await handler(params, guild)
 
     async def _create(self, params: dict, guild: discord.Guild) -> dict:
+        """カテゴリを作成する。"""
         name = params.get("name")
         if not name:
             return {"success": False, "action": "create", "details": "Missing 'name' parameter"}
@@ -84,6 +86,7 @@ class CategoryExecutionAgent(ExecutionAgent):
             return {"success": False, "action": "create", "details": str(e)}
 
     async def _edit(self, params: dict, guild: discord.Guild) -> dict:
+        """カテゴリを編集する。"""
         category_id = params.get("category_id")
         if not category_id:
             return {"success": False, "action": "edit", "details": "Missing 'category_id' parameter"}
@@ -107,6 +110,7 @@ class CategoryExecutionAgent(ExecutionAgent):
             return {"success": False, "action": "edit", "details": str(e)}
 
     async def _delete(self, params: dict, guild: discord.Guild) -> dict:
+        """カテゴリを削除する。"""
         category_id = params.get("category_id")
         if not category_id:
             return {"success": False, "action": "delete", "details": "Missing 'category_id' parameter"}

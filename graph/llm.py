@@ -1,5 +1,4 @@
 import logging
-from typing import Any
 
 from langchain_core.language_models import BaseChatModel
 
@@ -12,7 +11,21 @@ def create_llm(
     api_key: str | None = None,
     base_url: str | None = None,
 ) -> BaseChatModel:
-    """Factory: create LLM instance from provider name."""
+    """プロバイダー名からLLMインスタンスを生成するファクトリ関数。
+
+    Args:
+        provider: LLMプロバイダー（``"openai"`` / ``"anthropic"`` / ``"custom"``）。
+        model: モデル名。未指定時はプロバイダーのデフォルト。
+        api_key: APIキー。
+        base_url: カスタムAPIのベースURL（``custom`` プロバイダー時は必須）。
+
+    Returns:
+        LangChainの :class:`BaseChatModel` インスタンス。
+
+    Raises:
+        ValueError: 不明なプロバイダー、または ``custom`` で ``base_url`` 未指定。
+        ImportError: ``anthropic`` プロバイダーで ``langchain-anthropic`` 未導入。
+    """
     match provider:
         case "openai":
             from langchain_openai import ChatOpenAI

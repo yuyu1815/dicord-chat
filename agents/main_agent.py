@@ -8,7 +8,6 @@ from graph.state import AgentState
 
 logger = logging.getLogger("discord_bot")
 
-
 INVESTIGATION_TARGETS = [
     "server", "channel", "category", "thread", "forum",
     "message", "role", "permission", "member", "vc",
@@ -46,13 +45,20 @@ Rules:
 
 
 class MainAgent:
-    """Orchestrator: parses requests, decomposes tasks, routes to agents."""
+    """オーケストレーター。リクエストの解析・タスク分解・エージェントへの振り分けを行う。"""
 
     def __init__(self, llm: BaseChatModel) -> None:
         self.llm = llm
 
     async def parse_request(self, state: AgentState) -> dict[str, Any]:
-        """Use LLM to determine which agents to invoke and what actions to take."""
+        """LLMを使用して、どのエージェントを呼び出し、何のアクションを実行するかを判定する。
+
+        Args:
+            state: ユーザーリクエストを含むワークフロー状態。
+
+        Returns:
+            調査対象・実行候補・タスクリストを含む辞書。
+        """
         if not state.get("request"):
             return {"investigation_targets": [], "execution_candidates": [], "todos": []}
 
@@ -75,7 +81,14 @@ class MainAgent:
             return {"investigation_targets": [], "execution_candidates": [], "todos": []}
 
     def build_todos(self, parsed: dict[str, Any]) -> list[dict[str, Any]]:
-        """Convert parsed results into structured todos."""
+        """LLMの解析結果を構造化されたタスクリストに変換する。
+
+        Args:
+            parsed: :meth:`parse_request` の戻り値。
+
+        Returns:
+            各タスクのエージェント名・アクション・パラメータを含むリスト。
+        """
         todos: list[dict[str, Any]] = []
         for target in parsed.get("investigation_targets", []):
             todos.append({"agent": f"{target}_investigation", "action": "investigate", "params": {}})

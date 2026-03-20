@@ -5,20 +5,28 @@ from graph.state import AgentState
 
 
 class BaseAgent(ABC):
-    """All agents inherit from this."""
+    """全エージェントの基底クラス。"""
 
     @property
     @abstractmethod
     def name(self) -> str:
-        """Unique agent identifier."""
+        """エージェントの一意識別子を返す。"""
 
     @abstractmethod
     async def run(self, state: AgentState, guild: Any) -> AgentState:
-        """Execute agent logic, return updated state."""
+        """エージェントの処理を実行し、更新済みの状態を返す。
+
+        Args:
+            state: LangGraphワークフローの状態。
+            guild: 対象のDiscordサーバー。
+
+        Returns:
+            更新された状態。
+        """
 
 
 class InvestigationAgent(BaseAgent):
-    """Read-only agent that gathers information."""
+    """読み取り専用エージェント。情報を収集する。"""
 
     async def run(self, state: AgentState, guild: Any) -> AgentState:
         if "investigation_results" not in state:
@@ -29,11 +37,19 @@ class InvestigationAgent(BaseAgent):
 
     @abstractmethod
     async def investigate(self, state: AgentState, guild: Any) -> dict[str, Any]:
-        """Gather information (read-only)."""
+        """対象の情報を収集する（読み取り専用）。
+
+        Args:
+            state: LangGraphワークフローの状態。
+            guild: 対象のDiscordサーバー。
+
+        Returns:
+            収集結果の辞書。
+        """
 
 
 class ExecutionAgent(BaseAgent):
-    """Write agent that performs changes after user approval."""
+    """書き込みエージェント。ユーザー承認後に変更操作を実行する。"""
 
     ACTION_PERMISSIONS: dict[str, list[str]] = {}
 
@@ -75,4 +91,12 @@ class ExecutionAgent(BaseAgent):
 
     @abstractmethod
     async def execute(self, state: AgentState, guild: Any) -> dict[str, Any]:
-        """Perform change operation."""
+        """変更操作を実行する。
+
+        Args:
+            state: LangGraphワークフローの状態。
+            guild: 対象のDiscordサーバー。
+
+        Returns:
+            実行結果の辞書。
+        """

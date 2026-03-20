@@ -5,7 +5,7 @@ from graph.state import AgentState
 
 
 class ChannelExecutionAgent(ExecutionAgent):
-    """Handles text and voice channel operations."""
+    """テキスト・ボイスチャンネルの操作を行うエージェント。"""
 
     ACTION_PERMISSIONS: dict[str, list[str]] = {
         "create": ["manage_channels"],
@@ -19,6 +19,7 @@ class ChannelExecutionAgent(ExecutionAgent):
         return "channel_execution"
 
     async def execute(self, state: AgentState, guild: discord.Guild) -> dict:
+        """チャンネルの作成・編集・削除・並び替えを実行する。"""
         todos = state.get("todos", [])
         my_todos = [t for t in todos if t.get("agent") == self.name and not t.get("_blocked")]
         if not my_todos:
@@ -48,6 +49,7 @@ class ChannelExecutionAgent(ExecutionAgent):
         return await handler(params, guild)
 
     async def _create(self, params: dict, guild: discord.Guild) -> dict:
+        """チャンネルを作成する。"""
         name = params.get("name")
         if not name:
             return {"success": False, "action": "create", "details": "Missing 'name' parameter"}
@@ -80,6 +82,7 @@ class ChannelExecutionAgent(ExecutionAgent):
             return {"success": False, "action": "create", "details": str(e)}
 
     async def _edit(self, params: dict, guild: discord.Guild) -> dict:
+        """チャンネルを編集する。"""
         channel_id = params.get("channel_id")
         if not channel_id:
             return {"success": False, "action": "edit", "details": "Missing 'channel_id' parameter"}
@@ -107,6 +110,7 @@ class ChannelExecutionAgent(ExecutionAgent):
             return {"success": False, "action": "edit", "details": str(e)}
 
     async def _delete(self, params: dict, guild: discord.Guild) -> dict:
+        """チャンネルを削除する。"""
         channel_id = params.get("channel_id")
         if not channel_id:
             return {"success": False, "action": "delete", "details": "Missing 'channel_id' parameter"}
@@ -121,6 +125,7 @@ class ChannelExecutionAgent(ExecutionAgent):
             return {"success": False, "action": "delete", "details": str(e)}
 
     async def _reorder(self, params: dict, guild: discord.Guild) -> dict:
+        """チャンネルの並び順を変更する。"""
         positions = params.get("channel_positions", [])
         if not positions:
             return {"success": False, "action": "reorder", "details": "Missing 'channel_positions' parameter"}

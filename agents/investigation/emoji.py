@@ -5,11 +5,22 @@ from graph.state import AgentState
 
 
 class EmojiInvestigationAgent(InvestigationAgent):
+    """カスタム絵文字を調査するエージェント。"""
+
     @property
     def name(self) -> str:
         return "emoji_investigation"
 
     async def investigate(self, state: AgentState, guild: discord.Guild) -> dict:
+        """全カスタム絵文字を収集する。
+
+        Args:
+            state: ワークフロー状態。
+            guild: 対象サーバー。
+
+        Returns:
+            絵文字情報のリスト。
+        """
         if not guild.emojis:
             return {"emojis": []}
 

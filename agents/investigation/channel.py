@@ -7,11 +7,22 @@ MAX_TOPIC_LENGTH = 200
 
 
 class ChannelInvestigationAgent(InvestigationAgent):
+    """チャンネル情報を調査するエージェント。"""
+
     @property
     def name(self) -> str:
         return "channel_investigation"
 
     async def investigate(self, state: AgentState, guild: discord.Guild) -> dict:
+        """テキスト・ボイス・ステージチャンネルの情報を収集する。
+
+        Args:
+            state: ワークフロー状態。
+            guild: 対象サーバー。
+
+        Returns:
+            チャンネルタイプ別の情報を含む辞書。
+        """
         def _channel_info(ch: discord.abc.GuildChannel) -> dict:
             base = {
                 "id": ch.id,

@@ -5,7 +5,7 @@ from graph.state import AgentState
 
 
 class ThreadExecutionAgent(ExecutionAgent):
-    """Handles thread operations (create, edit, archive, lock, membership)."""
+    """スレッドの作成・編集・アーカイブ・ロック・メンバー管理を行うエージェント。"""
 
     ACTION_PERMISSIONS: dict[str, list[str]] = {
         "create": ["create_public_threads"],
@@ -21,6 +21,7 @@ class ThreadExecutionAgent(ExecutionAgent):
         return "thread_execution"
 
     async def execute(self, state: AgentState, guild: discord.Guild) -> dict:
+        """スレッド関連の操作を実行する。"""
         todos = state.get("todos", [])
         my_todos = [t for t in todos if t.get("agent") == self.name and not t.get("_blocked")]
         if not my_todos:
@@ -52,6 +53,7 @@ class ThreadExecutionAgent(ExecutionAgent):
         return await handler(params, guild)
 
     async def _create(self, params: dict, guild: discord.Guild) -> dict:
+        """スレッドを作成する。"""
         channel_id = params.get("channel_id")
         name = params.get("name")
         if not channel_id:
@@ -79,13 +81,13 @@ class ThreadExecutionAgent(ExecutionAgent):
             return {"success": False, "action": "create", "details": str(e)}
 
     async def _edit(self, params: dict, guild: discord.Guild) -> dict:
+        """スレッドを編集する。"""
         thread_id = params.get("thread_id")
         if not thread_id:
             return {"success": False, "action": "edit", "details": "Missing 'thread_id' parameter"}
 
         thread = guild.get_thread(thread_id)
         if not thread:
-            # Fallback: fetch from channel threads
             thread = await self._find_thread(guild, thread_id)
         if not thread:
             return {"success": False, "action": "edit", "details": f"Thread {thread_id} not found"}
@@ -110,6 +112,7 @@ class ThreadExecutionAgent(ExecutionAgent):
             return {"success": False, "action": "edit", "details": str(e)}
 
     async def _delete(self, params: dict, guild: discord.Guild) -> dict:
+        """スレッドを削除する。"""
         thread_id = params.get("thread_id")
         if not thread_id:
             return {"success": False, "action": "delete", "details": "Missing 'thread_id' parameter"}
@@ -128,6 +131,7 @@ class ThreadExecutionAgent(ExecutionAgent):
             return {"success": False, "action": "delete", "details": str(e)}
 
     async def _add_member(self, params: dict, guild: discord.Guild) -> dict:
+        """メンバーをスレッドに追加する。"""
         thread_id = params.get("thread_id")
         member_id = params.get("member_id")
         if not thread_id:
@@ -152,6 +156,7 @@ class ThreadExecutionAgent(ExecutionAgent):
             return {"success": False, "action": "add_member", "details": str(e)}
 
     async def _join(self, params: dict, guild: discord.Guild) -> dict:
+        """ボットをスレッドに参加させる。"""
         thread_id = params.get("thread_id")
         if not thread_id:
             return {"success": False, "action": "join", "details": "Missing 'thread_id' parameter"}
@@ -169,6 +174,7 @@ class ThreadExecutionAgent(ExecutionAgent):
             return {"success": False, "action": "join", "details": str(e)}
 
     async def _leave(self, params: dict, guild: discord.Guild) -> dict:
+        """ボットをスレッドから退出させる。"""
         thread_id = params.get("thread_id")
         if not thread_id:
             return {"success": False, "action": "leave", "details": "Missing 'thread_id' parameter"}
@@ -186,7 +192,7 @@ class ThreadExecutionAgent(ExecutionAgent):
             return {"success": False, "action": "leave", "details": str(e)}
 
     async def _find_thread(self, guild: discord.Guild, thread_id: int) -> discord.Thread | None:
-        """Search active threads in the guild for a thread by ID."""
+        """サーバー内のアクティブスレッドからIDで検索する。"""
         for channel in guild.text_channels:
             for thread in channel.threads:
                 if thread.id == thread_id:

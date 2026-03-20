@@ -5,7 +5,7 @@ from graph.state import AgentState
 
 
 class PermissionExecutionAgent(ExecutionAgent):
-    """Handles channel permission overwrites: set, delete, sync."""
+    """チャンネル権限オーバーライドの設定・削除・同期を行うエージェント。"""
 
     ACTION_PERMISSIONS: dict[str, list[str]] = {
         "set_channel_permission": ["manage_roles"],
@@ -18,6 +18,7 @@ class PermissionExecutionAgent(ExecutionAgent):
         return "permission_execution"
 
     async def execute(self, state: AgentState, guild: discord.Guild) -> dict:
+        """権限操作を実行する。"""
         todos = state.get("todos", [])
         my_todos = [t for t in todos if t.get("agent") == self.name and not t.get("_blocked")]
         if not my_todos:
@@ -46,11 +47,13 @@ class PermissionExecutionAgent(ExecutionAgent):
         return await handler(params, guild)
 
     def _resolve_target(self, guild: discord.Guild, target_type: str, target_id: int) -> discord.Role | discord.Member | None:
+        """target_type に応じてロールまたはメンバーを取得する。"""
         if target_type == "member":
             return guild.get_member(target_id)
         return guild.get_role(target_id)
 
     async def _set_channel_permission(self, params: dict, guild: discord.Guild) -> dict:
+        """チャンネルの権限オーバーライドを設定する。"""
         channel_id = params.get("channel_id")
         target_type = params.get("target_type", "role")
         target_id = params.get("target_id")
@@ -84,6 +87,7 @@ class PermissionExecutionAgent(ExecutionAgent):
             return {"success": False, "action": "set_channel_permission", "details": str(e)}
 
     async def _delete_channel_permission(self, params: dict, guild: discord.Guild) -> dict:
+        """チャンネルの権限オーバーライドを削除する。"""
         channel_id = params.get("channel_id")
         overwrite_id = params.get("overwrite_id")
         if not channel_id:
@@ -95,7 +99,6 @@ class PermissionExecutionAgent(ExecutionAgent):
         if not channel:
             return {"success": False, "action": "delete_channel_permission", "details": f"Channel {channel_id} not found"}
 
-        # Resolve the target (role or member) for deletion
         target = guild.get_role(overwrite_id) or guild.get_member(overwrite_id)
         if not target:
             return {"success": False, "action": "delete_channel_permission", "details": f"Target {overwrite_id} not found"}
@@ -108,6 +111,7 @@ class PermissionExecutionAgent(ExecutionAgent):
             return {"success": False, "action": "delete_channel_permission", "details": str(e)}
 
     async def _sync_permissions(self, params: dict, guild: discord.Guild) -> dict:
+        """チャンネルの権限をカテゴリと同期する。"""
         channel_id = params.get("channel_id")
         category_id = params.get("category_id")
         if not channel_id:
@@ -117,7 +121,6 @@ class PermissionExecutionAgent(ExecutionAgent):
         if not channel:
             return {"success": False, "action": "sync_permissions", "details": f"Channel {channel_id} not found"}
 
-        # If category_id is provided, verify it matches or set the category first
         if category_id:
             category = guild.get_channel(category_id)
             if category and isinstance(category, discord.CategoryChannel):
@@ -126,7 +129,6 @@ class PermissionExecutionAgent(ExecutionAgent):
                 except (discord.Forbidden, discord.HTTPException):
                     return {"success": False, "action": "sync_permissions", "details": f"Failed to move channel to category {category_id}"}
 
-        # Sync permissions with category
         try:
             await channel.edit(sync_permissions=True)
             return {"success": True, "action": "sync_permissions", "details": f"Synced permissions for #{channel.name} with its category"}

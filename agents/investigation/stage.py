@@ -5,11 +5,22 @@ from graph.state import AgentState
 
 
 class StageInvestigationAgent(InvestigationAgent):
+    """ステージチャンネルを調査するエージェント。"""
+
     @property
     def name(self) -> str:
         return "stage_investigation"
 
     async def investigate(self, state: AgentState, guild: discord.Guild) -> dict:
+        """全ステージチャンネルとそのステージインスタンスを収集する。
+
+        Args:
+            state: ワークフロー状態。
+            guild: 対象サーバー。
+
+        Returns:
+            ステージ情報のリスト。
+        """
         if not guild.stage_channels:
             return {"stages": []}
 

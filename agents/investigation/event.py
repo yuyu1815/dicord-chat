@@ -5,11 +5,22 @@ from graph.state import AgentState
 
 
 class EventInvestigationAgent(InvestigationAgent):
+    """スケジュールイベントを調査するエージェント。"""
+
     @property
     def name(self) -> str:
         return "event_investigation"
 
     async def investigate(self, state: AgentState, guild: discord.Guild) -> dict:
+        """全スケジュールイベントを収集する。
+
+        Args:
+            state: ワークフロー状態。
+            guild: 対象サーバー。
+
+        Returns:
+            イベント情報のリスト。
+        """
         if not guild.scheduled_events:
             return {"events": []}
 

@@ -4,6 +4,8 @@ from discord.ext.commands import Context
 
 
 class General(commands.Cog, name="general"):
+    """汎用コマンドを提供するCog。"""
+
     def __init__(self, bot) -> None:
         self.bot = bot
 
@@ -11,6 +13,7 @@ class General(commands.Cog, name="general"):
         name="help", description="List all commands the bot has loaded."
     )
     async def help(self, context: Context) -> None:
+        """全コマンドの一覧を表示する。"""
         embed = discord.Embed(
             title="Help", description="List of available commands:", color=0xBEBEFE
         )
@@ -32,6 +35,7 @@ class General(commands.Cog, name="general"):
         description="Check if the bot is alive.",
     )
     async def ping(self, context: Context) -> None:
+        """ボットの応答速度を確認する。"""
         embed = discord.Embed(
             title="🏓 Pong!",
             description=f"The bot latency is {round(self.bot.latency * 1000)}ms.",

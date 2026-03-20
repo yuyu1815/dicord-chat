@@ -5,11 +5,22 @@ from graph.state import AgentState
 
 
 class WebhookInvestigationAgent(InvestigationAgent):
+    """Webhookを調査するエージェント。"""
+
     @property
     def name(self) -> str:
         return "webhook_investigation"
 
     async def investigate(self, state: AgentState, guild: discord.Guild) -> dict:
+        """全テキストチャンネルのWebhookを収集する。
+
+        Args:
+            state: ワークフロー状態。
+            guild: 対象サーバー。
+
+        Returns:
+            Webhook情報のリスト。
+        """
         if not guild.text_channels:
             return {"webhooks": []}
 

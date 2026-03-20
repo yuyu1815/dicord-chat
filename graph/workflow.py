@@ -4,13 +4,17 @@ from graph.state import AgentState
 
 
 def build_workflow() -> StateGraph:
-    """Build the LangGraph state machine for the agent system."""
+    """エージェントシステムのLangGraphステートマシンを構築する。
+
+    Returns:
+        構築された :class:`StateGraph` インスタンス。
+    """
     workflow = StateGraph(AgentState)
 
     workflow.set_entry_point("wait_for_approval")
 
     def wait_for_approval(state: AgentState) -> dict[str, bool]:
-        """Gate node: check if user has approved execution."""
+        """ユーザーの承認状態を確認するゲートノード。"""
         approved = state.get("approved", False)
         return {"approved": approved}
 

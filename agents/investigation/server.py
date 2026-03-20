@@ -5,11 +5,22 @@ from graph.state import AgentState
 
 
 class ServerInvestigationAgent(InvestigationAgent):
+    """サーバー情報を調査するエージェント。"""
+
     @property
     def name(self) -> str:
         return "server_investigation"
 
     async def investigate(self, state: AgentState, guild: discord.Guild) -> dict:
+        """サーバーの基本情報を収集する。
+
+        Args:
+            state: ワークフロー状態。
+            guild: 対象サーバー。
+
+        Returns:
+            サーバー名・メンバー数・認証レベルなどを含む辞書。
+        """
         return {
             "name": guild.name,
             "id": guild.id,

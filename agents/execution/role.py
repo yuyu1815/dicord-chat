@@ -5,7 +5,7 @@ from graph.state import AgentState
 
 
 class RoleExecutionAgent(ExecutionAgent):
-    """Handles role create, edit, delete, reorder, assign, and revoke operations."""
+    """ロールの作成・編集・削除・並び替え・付与・剥奪を行うエージェント。"""
 
     ACTION_PERMISSIONS: dict[str, list[str]] = {
         "create": ["manage_roles"],
@@ -21,6 +21,7 @@ class RoleExecutionAgent(ExecutionAgent):
         return "role_execution"
 
     async def execute(self, state: AgentState, guild: discord.Guild) -> dict:
+        """ロール関連の操作を実行する。"""
         todos = state.get("todos", [])
         my_todos = [t for t in todos if t.get("agent") == self.name and not t.get("_blocked")]
         if not my_todos:
@@ -52,6 +53,7 @@ class RoleExecutionAgent(ExecutionAgent):
         return await handler(params, guild)
 
     async def _create(self, params: dict, guild: discord.Guild) -> dict:
+        """ロールを作成する。"""
         name = params.get("name")
         if not name:
             return {"success": False, "action": "create", "details": "Missing 'name' parameter"}
@@ -74,6 +76,7 @@ class RoleExecutionAgent(ExecutionAgent):
             return {"success": False, "action": "create", "details": str(e)}
 
     async def _edit(self, params: dict, guild: discord.Guild) -> dict:
+        """ロールを編集する。"""
         role_id = params.get("role_id")
         if not role_id:
             return {"success": False, "action": "edit", "details": "Missing 'role_id' parameter"}
@@ -104,6 +107,7 @@ class RoleExecutionAgent(ExecutionAgent):
             return {"success": False, "action": "edit", "details": str(e)}
 
     async def _delete(self, params: dict, guild: discord.Guild) -> dict:
+        """ロールを削除する。"""
         role_id = params.get("role_id")
         if not role_id:
             return {"success": False, "action": "delete", "details": "Missing 'role_id' parameter"}
@@ -120,11 +124,11 @@ class RoleExecutionAgent(ExecutionAgent):
             return {"success": False, "action": "delete", "details": str(e)}
 
     async def _reorder(self, params: dict, guild: discord.Guild) -> dict:
+        """ロールの並び順を変更する。"""
         roles = params.get("roles", [])
         if not roles:
             return {"success": False, "action": "reorder", "details": "Missing 'roles' parameter"}
 
-        # Discord expects list of Role objects or dicts with id and position
         try:
             await guild.edit_role_positions(roles)
             return {"success": True, "action": "reorder", "details": f"Reordered {len(roles)} role(s)"}
@@ -132,6 +136,7 @@ class RoleExecutionAgent(ExecutionAgent):
             return {"success": False, "action": "reorder", "details": str(e)}
 
     async def _assign(self, params: dict, guild: discord.Guild) -> dict:
+        """メンバーにロールを付与する。"""
         member_id = params.get("member_id")
         role_id = params.get("role_id")
         if not member_id:
@@ -154,6 +159,7 @@ class RoleExecutionAgent(ExecutionAgent):
             return {"success": False, "action": "assign", "details": str(e)}
 
     async def _revoke(self, params: dict, guild: discord.Guild) -> dict:
+        """メンバーからロールを剥奪する。"""
         member_id = params.get("member_id")
         role_id = params.get("role_id")
         if not member_id:

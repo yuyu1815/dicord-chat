@@ -6,7 +6,7 @@ from graph.state import AgentState
 
 
 class ServerExecutionAgent(ExecutionAgent):
-    """Handles server-wide configuration changes."""
+    """サーバー全体の設定変更を行うエージェント。"""
 
     ACTION_PERMISSIONS: dict[str, list[str]] = {
         "edit_name": ["manage_guild"],
@@ -22,6 +22,7 @@ class ServerExecutionAgent(ExecutionAgent):
         return "server_execution"
 
     async def execute(self, state: AgentState, guild: discord.Guild) -> dict:
+        """サーバー設定の変更操作を実行する。"""
         todos = state.get("todos", [])
         my_todos = [t for t in todos if t.get("agent") == self.name and not t.get("_blocked")]
         if not my_todos:
@@ -53,6 +54,7 @@ class ServerExecutionAgent(ExecutionAgent):
         return await handler(params, guild)
 
     async def _edit_name(self, params: dict, guild: discord.Guild) -> dict:
+        """サーバー名を変更する。"""
         name = params.get("name")
         if not name:
             return {"success": False, "action": "edit_name", "details": "Missing 'name' parameter"}
@@ -63,6 +65,7 @@ class ServerExecutionAgent(ExecutionAgent):
             return {"success": False, "action": "edit_name", "details": str(e)}
 
     async def _edit_description(self, params: dict, guild: discord.Guild) -> dict:
+        """サーバー説明文を変更する。"""
         description = params.get("description")
         if description is None:
             return {"success": False, "action": "edit_description", "details": "Missing 'description' parameter"}
@@ -73,6 +76,7 @@ class ServerExecutionAgent(ExecutionAgent):
             return {"success": False, "action": "edit_description", "details": str(e)}
 
     async def _edit_verification_level(self, params: dict, guild: discord.Guild) -> dict:
+        """サーバーの認証レベルを変更する。"""
         level_name = params.get("level")
         if not level_name:
             return {"success": False, "action": "edit_verification_level", "details": "Missing 'level' parameter"}
@@ -93,6 +97,7 @@ class ServerExecutionAgent(ExecutionAgent):
             return {"success": False, "action": "edit_verification_level", "details": str(e)}
 
     async def _edit_system_channel(self, params: dict, guild: discord.Guild) -> dict:
+        """システムチャンネルを設定する。"""
         channel_id = params.get("channel_id")
         if not channel_id:
             return {"success": False, "action": "edit_system_channel", "details": "Missing 'channel_id' parameter"}
@@ -106,6 +111,7 @@ class ServerExecutionAgent(ExecutionAgent):
             return {"success": False, "action": "edit_system_channel", "details": str(e)}
 
     async def _edit_rules_channel(self, params: dict, guild: discord.Guild) -> dict:
+        """ルールチャンネルを設定する。"""
         channel_id = params.get("channel_id")
         if not channel_id:
             return {"success": False, "action": "edit_rules_channel", "details": "Missing 'channel_id' parameter"}
@@ -119,8 +125,7 @@ class ServerExecutionAgent(ExecutionAgent):
             return {"success": False, "action": "edit_rules_channel", "details": str(e)}
 
     async def _edit_banner(self, params: dict, guild: discord.Guild) -> dict:
-        # Banner can only be set via guild.edit(banner=bytes) with image bytes
-        # This expects the caller to provide raw image bytes via "banner" key
+        """サーバーバナー画像を設定する。"""
         banner = params.get("banner")
         if not banner:
             return {"success": False, "action": "edit_banner", "details": "Missing 'banner' parameter (image bytes)"}

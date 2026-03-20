@@ -5,11 +5,22 @@ from graph.state import AgentState
 
 
 class InviteInvestigationAgent(InvestigationAgent):
+    """招待リンクを調査するエージェント。"""
+
     @property
     def name(self) -> str:
         return "invite_investigation"
 
     async def investigate(self, state: AgentState, guild: discord.Guild) -> dict:
+        """全招待リンクを収集する。
+
+        Args:
+            state: ワークフロー状態。
+            guild: 対象サーバー。
+
+        Returns:
+            招待リンク情報のリスト。
+        """
         invites = await guild.invites()
         if not invites:
             return {"invites": []}

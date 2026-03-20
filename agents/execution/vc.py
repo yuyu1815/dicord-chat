@@ -5,7 +5,7 @@ from graph.state import AgentState
 
 
 class VoiceChannelExecutionAgent(ExecutionAgent):
-    """Handles voice channel operations: move, mute, deafen, disconnect, edit."""
+    """ボイスチャンネルの操作（メンバー移動・ミュート・切断・チャンネル編集）を行うエージェント。"""
 
     ACTION_PERMISSIONS: dict[str, list[str]] = {
         "move_user": ["move_members"],
@@ -22,6 +22,7 @@ class VoiceChannelExecutionAgent(ExecutionAgent):
         return "vc_execution"
 
     async def execute(self, state: AgentState, guild: discord.Guild) -> dict:
+        """ボイスチャンネル関連の操作を実行する。"""
         todos = state.get("todos", [])
         my_todos = [t for t in todos if t.get("agent") == self.name and not t.get("_blocked")]
         if not my_todos:
@@ -54,6 +55,7 @@ class VoiceChannelExecutionAgent(ExecutionAgent):
         return await handler(params, guild)
 
     async def _move_user(self, params: dict, guild: discord.Guild) -> dict:
+        """メンバーをボイスチャンネルに移動させる。"""
         user_id = params.get("user_id")
         channel_id = params.get("channel_id")
         if not user_id:
@@ -76,6 +78,7 @@ class VoiceChannelExecutionAgent(ExecutionAgent):
             return {"success": False, "action": "move_user", "details": str(e)}
 
     async def _mute(self, params: dict, guild: discord.Guild) -> dict:
+        """メンバーをサーバーミュートにする。"""
         user_id = params.get("user_id")
         if not user_id:
             return {"success": False, "action": "mute", "details": "Missing 'user_id' parameter"}
@@ -91,6 +94,7 @@ class VoiceChannelExecutionAgent(ExecutionAgent):
             return {"success": False, "action": "mute", "details": str(e)}
 
     async def _unmute(self, params: dict, guild: discord.Guild) -> dict:
+        """メンバーのサーバーミュートを解除する。"""
         user_id = params.get("user_id")
         if not user_id:
             return {"success": False, "action": "unmute", "details": "Missing 'user_id' parameter"}
@@ -106,6 +110,7 @@ class VoiceChannelExecutionAgent(ExecutionAgent):
             return {"success": False, "action": "unmute", "details": str(e)}
 
     async def _deafen(self, params: dict, guild: discord.Guild) -> dict:
+        """メンバーをサーバー聴覚禁止にする。"""
         user_id = params.get("user_id")
         if not user_id:
             return {"success": False, "action": "deafen", "details": "Missing 'user_id' parameter"}
@@ -121,6 +126,7 @@ class VoiceChannelExecutionAgent(ExecutionAgent):
             return {"success": False, "action": "deafen", "details": str(e)}
 
     async def _undeafen(self, params: dict, guild: discord.Guild) -> dict:
+        """メンバーのサーバー聴覚禁止を解除する。"""
         user_id = params.get("user_id")
         if not user_id:
             return {"success": False, "action": "undeafen", "details": "Missing 'user_id' parameter"}
@@ -136,6 +142,7 @@ class VoiceChannelExecutionAgent(ExecutionAgent):
             return {"success": False, "action": "undeafen", "details": str(e)}
 
     async def _disconnect(self, params: dict, guild: discord.Guild) -> dict:
+        """メンバーをボイスチャンネルから切断する。"""
         user_id = params.get("user_id")
         if not user_id:
             return {"success": False, "action": "disconnect", "details": "Missing 'user_id' parameter"}
@@ -151,6 +158,7 @@ class VoiceChannelExecutionAgent(ExecutionAgent):
             return {"success": False, "action": "disconnect", "details": str(e)}
 
     async def _edit_channel(self, params: dict, guild: discord.Guild) -> dict:
+        """ボイスチャンネルの設定を編集する。"""
         channel_id = params.get("channel_id")
         if not channel_id:
             return {"success": False, "action": "edit_channel", "details": "Missing 'channel_id' parameter"}

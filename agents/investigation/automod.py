@@ -5,11 +5,22 @@ from graph.state import AgentState
 
 
 class AutoModInvestigationAgent(InvestigationAgent):
+    """AutoModルールを調査するエージェント。"""
+
     @property
     def name(self) -> str:
         return "automod_investigation"
 
     async def investigate(self, state: AgentState, guild: discord.Guild) -> dict:
+        """全AutoModルールを収集する。
+
+        Args:
+            state: ワークフロー状態。
+            guild: 対象サーバー。
+
+        Returns:
+            AutoModルール情報のリスト。
+        """
         rules = await guild.fetch_automod_rules()
         if not rules:
             return {"auto_moderation_rules": []}

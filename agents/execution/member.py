@@ -5,7 +5,7 @@ from graph.state import AgentState
 
 
 class MemberExecutionAgent(ExecutionAgent):
-    """Handles member moderation: nickname, roles, timeout, kick, ban, unban."""
+    """メンバー管理（ニックネーム・ロール・タイムアウト・キック・BAN）を行うエージェント。"""
 
     ACTION_PERMISSIONS: dict[str, list[str]] = {
         "edit_nickname": ["manage_nicknames"],
@@ -21,6 +21,7 @@ class MemberExecutionAgent(ExecutionAgent):
         return "member_execution"
 
     async def execute(self, state: AgentState, guild: discord.Guild) -> dict:
+        """メンバー管理の操作を実行する。"""
         todos = state.get("todos", [])
         my_todos = [t for t in todos if t.get("agent") == self.name and not t.get("_blocked")]
         if not my_todos:
@@ -52,6 +53,7 @@ class MemberExecutionAgent(ExecutionAgent):
         return await handler(params, guild)
 
     async def _edit_nickname(self, params: dict, guild: discord.Guild) -> dict:
+        """メンバーのニックネームを変更する。"""
         member_id = params.get("member_id")
         nickname = params.get("nickname")
         if not member_id:
@@ -70,6 +72,7 @@ class MemberExecutionAgent(ExecutionAgent):
             return {"success": False, "action": "edit_nickname", "details": str(e)}
 
     async def _edit_roles(self, params: dict, guild: discord.Guild) -> dict:
+        """メンバーのロールを一括変更する。"""
         member_id = params.get("member_id")
         if not member_id:
             return {"success": False, "action": "edit_roles", "details": "Missing 'member_id' parameter"}
@@ -108,6 +111,7 @@ class MemberExecutionAgent(ExecutionAgent):
             return {"success": False, "action": "edit_roles", "details": str(e)}
 
     async def _timeout(self, params: dict, guild: discord.Guild) -> dict:
+        """メンバーをタイムアウト（ミュート）する。"""
         member_id = params.get("member_id")
         duration_minutes = params.get("duration_minutes")
         reason = params.get("reason")
@@ -130,6 +134,7 @@ class MemberExecutionAgent(ExecutionAgent):
             return {"success": False, "action": "timeout", "details": str(e)}
 
     async def _kick(self, params: dict, guild: discord.Guild) -> dict:
+        """メンバーをキックする。"""
         member_id = params.get("member_id")
         reason = params.get("reason")
         if not member_id:
@@ -146,6 +151,7 @@ class MemberExecutionAgent(ExecutionAgent):
             return {"success": False, "action": "kick", "details": str(e)}
 
     async def _ban(self, params: dict, guild: discord.Guild) -> dict:
+        """メンバーをBANする。"""
         member_id = params.get("member_id")
         reason = params.get("reason")
         delete_message_days = params.get("delete_message_days", 0)
@@ -163,12 +169,12 @@ class MemberExecutionAgent(ExecutionAgent):
             return {"success": False, "action": "ban", "details": str(e)}
 
     async def _unban(self, params: dict, guild: discord.Guild) -> dict:
+        """ユーザーのBANを解除する。"""
         user_id = params.get("user_id")
         reason = params.get("reason")
         if not user_id:
             return {"success": False, "action": "unban", "details": "Missing 'user_id' parameter"}
 
-        # Create a partial user object for the ban lookup
         user = discord.Object(id=user_id)
         try:
             await guild.unban(user, reason=reason)

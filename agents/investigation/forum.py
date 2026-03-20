@@ -5,11 +5,22 @@ from graph.state import AgentState
 
 
 class ForumInvestigationAgent(InvestigationAgent):
+    """フォーラムチャンネル情報を調査するエージェント。"""
+
     @property
     def name(self) -> str:
         return "forum_investigation"
 
     async def investigate(self, state: AgentState, guild: discord.Guild) -> dict:
+        """全フォーラムチャンネルとそのタグを収集する。
+
+        Args:
+            state: ワークフロー状態。
+            guild: 対象サーバー。
+
+        Returns:
+            フォーラム情報のリストと総数。
+        """
         forums = [
             {
                 "id": forum.id,

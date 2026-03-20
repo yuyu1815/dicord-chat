@@ -7,11 +7,22 @@ MAX_DEFAULT_ENTRIES = 20
 
 
 class AuditLogInvestigationAgent(InvestigationAgent):
+    """監査ログを調査するエージェント。"""
+
     @property
     def name(self) -> str:
         return "audit_log_investigation"
 
     async def investigate(self, state: AgentState, guild: discord.Guild) -> dict:
+        """サーバーの監査ログを取得する。
+
+        Args:
+            state: ワークフロー状態。
+            guild: 対象サーバー。
+
+        Returns:
+            監査ログエントリのリスト。
+        """
         limit = MAX_DEFAULT_ENTRIES
         if "request" in state and state["request"]:
             try:

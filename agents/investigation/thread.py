@@ -5,11 +5,22 @@ from graph.state import AgentState
 
 
 class ThreadInvestigationAgent(InvestigationAgent):
+    """スレッド情報を調査するエージェント。"""
+
     @property
     def name(self) -> str:
         return "thread_investigation"
 
     async def investigate(self, state: AgentState, guild: discord.Guild) -> dict:
+        """全スレッドの情報を収集する。
+
+        Args:
+            state: ワークフロー状態。
+            guild: 対象サーバー。
+
+        Returns:
+            スレッド情報のリストと総数。
+        """
         threads = [
             {
                 "id": thread.id,
