@@ -4,7 +4,15 @@ from typing import Any
 from langgraph.graph import END, StateGraph
 
 from agents.registry import get_single_action_agents, load_agent_module
-from graph.state import AgentState
+from graph.state import (
+    AgentState,
+    PLANNER_STATUS_DONE_NO_EXECUTION,
+    PLANNER_STATUS_ERROR,
+    PLANNER_STATUS_NEED_INVESTIGATION,
+    PLANNER_STATUS_READY_FOR_APPROVAL,
+    agent_target_from_name,
+    is_execution_todo,
+)
 
 logger = logging.getLogger("discord_bot")
 
@@ -79,7 +87,7 @@ def build_pre_approval_workflow() -> StateGraph:
 
         new_draft = list(state.get("draft_todos", []))
 
-        if decision["status"] == "need_investigation":
+        if decision["status"] == PLANNER_STATUS_NEED_INVESTIGATION:
             investigation_todos = planner.build_investigation_todos(
                 decision["investigation_targets"], state,
             )
@@ -96,7 +104,7 @@ def build_pre_approval_workflow() -> StateGraph:
                 "plan_status": "investigating",
                 "approval_required": False,
             }
-        elif decision["status"] == "ready_for_approval":
+        elif decision["status"] == PLANNER_STATUS_READY_FOR_APPROVAL:
             execution_todos = planner.build_execution_todos(
                 decision["execution_candidates"],
             )
@@ -133,7 +141,7 @@ def build_pre_approval_workflow() -> StateGraph:
                 "approval_required": True,
                 "approval_summary": decision.get("summary", ""),
             }
-        elif decision["status"] == "done_no_execution":
+        elif decision["status"] == PLANNER_STATUS_DONE_NO_EXECUTION:
             return {
                 "planner_decision": decision,
                 "planning_iteration": iteration,
@@ -175,7 +183,7 @@ def build_pre_approval_workflow() -> StateGraph:
             extra_state: dict[str, Any] = {}
             for todo in investigation_todos:
                 agent_name = todo.get("agent", "")
-                target = agent_name.replace("_investigation", "")
+                target = agent_target_from_name(agent_name)
                 agent = load_agent_module(target, "investigation")
                 if not agent:
                     logger.warning(
@@ -244,7 +252,7 @@ def build_pre_approval_workflow() -> StateGraph:
         # Only execution todos are actionable; investigation-only drafts
         # should not enter approval.
         execution_drafts = [
-            t for t in draft_todos if "investigation" not in t.get("agent", "")
+            t for t in draft_todos if is_execution_todo(t)
         ]
 
         if not execution_drafts:
@@ -401,7 +409,7 @@ def build_post_approval_workflow() -> StateGraph:
         """実行エージェントを実行する。"""
         proposed_todos = state.get("proposed_todos", [])
         execution_todos = [
-            t for t in proposed_todos if "investigation" not in t.get("agent", "")
+            t for t in proposed_todos if is_execution_todo(t)
         ]
 
         if not execution_todos:
@@ -423,7 +431,7 @@ def build_post_approval_workflow() -> StateGraph:
                 if agent_name in seen_agents:
                     continue
                 seen_agents.add(agent_name)
-                target = agent_name.replace("_execution", "")
+                target = agent_target_from_name(agent_name)
                 agent = load_agent_module(target, "execution")
                 if not agent:
                     results[agent_name] = {"error": f"Agent {agent_name} not available"}

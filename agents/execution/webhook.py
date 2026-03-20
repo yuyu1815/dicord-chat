@@ -1,21 +1,18 @@
 import discord
-from discord import HTTPException
 
-from agents.base import ExecutionAgent, _find_action
+from agents.base import SingleActionExecutionAgent
 from graph.state import AgentState
 
 NAME = "webhook_execution"
 
-ACTION_HANDLERS: dict[str, str] = {
-    "create": "Create webhook",
-    "edit": "Edit webhook",
-    "delete": "Delete webhook",
-    "execute": "Execute webhook",
-}
 
-
-class WebhookExecutionAgent(ExecutionAgent):
-    single_action: bool = True
+class WebhookExecutionAgent(SingleActionExecutionAgent):
+    ACTION_HANDLERS: dict[str, str] = {
+        "create": "Create webhook",
+        "edit": "Edit webhook",
+        "delete": "Delete webhook",
+        "execute": "Execute webhook",
+    }
 
     ACTION_PERMISSIONS: dict[str, list[str]] = {
         "create": ["manage_webhooks"],
@@ -24,32 +21,11 @@ class WebhookExecutionAgent(ExecutionAgent):
         "execute": ["manage_webhooks"],
     }
 
+    not_found_message: str = "Webhook or channel not found."
+
     @property
     def name(self) -> str:
         return NAME
-
-    async def execute(self, state: AgentState, guild: discord.Guild) -> dict:
-        action_name = _find_action(state, NAME)
-        if not action_name:
-            return {"success": False, "action": "none", "details": "No matching todo found."}
-
-        handler = ACTION_HANDLERS.get(action_name)
-        if not handler:
-            return {"success": False, "action": action_name, "details": f"Unknown action: {action_name}"}
-
-        params = next(
-            (t["params"] for t in state["todos"] if t.get("agent") == NAME and t.get("action") == action_name),
-            {},
-        )
-
-        try:
-            return await getattr(self, f"_do_{action_name}")(guild, params)
-        except discord.Forbidden:
-            return {"success": False, "action": action_name, "details": "Missing permissions."}
-        except discord.NotFound:
-            return {"success": False, "action": action_name, "details": "Webhook or channel not found."}
-        except HTTPException as exc:
-            return {"success": False, "action": action_name, "details": f"API error: {exc.text}"}
 
     async def _do_create(self, guild: discord.Guild, params: dict) -> dict:
         channel = guild.get_channel(params["channel_id"])

@@ -1,18 +1,11 @@
 import datetime
 
 import discord
-from discord import HTTPException
 
-from agents.base import ExecutionAgent, _find_action
+from agents.base import SingleActionExecutionAgent
 from graph.state import AgentState
 
 NAME = "automod_execution"
-
-ACTION_HANDLERS: dict[str, str] = {
-    "create_rule": "Create AutoMod rule",
-    "edit_rule": "Edit AutoMod rule",
-    "delete_rule": "Delete AutoMod rule",
-}
 
 
 def _build_trigger(trigger_type: str, metadata: dict | None) -> discord.AutoModTrigger:
@@ -62,8 +55,12 @@ def _build_actions(actions: list[dict] | None) -> list[discord.AutoModRuleAction
     return result
 
 
-class AutoModExecutionAgent(ExecutionAgent):
-    single_action: bool = True
+class AutoModExecutionAgent(SingleActionExecutionAgent):
+    ACTION_HANDLERS: dict[str, str] = {
+        "create_rule": "Create AutoMod rule",
+        "edit_rule": "Edit AutoMod rule",
+        "delete_rule": "Delete AutoMod rule",
+    }
 
     ACTION_PERMISSIONS: dict[str, list[str]] = {
         "create_rule": ["manage_guild"],
@@ -71,32 +68,11 @@ class AutoModExecutionAgent(ExecutionAgent):
         "delete_rule": ["manage_guild"],
     }
 
+    not_found_message: str = "Rule not found."
+
     @property
     def name(self) -> str:
         return NAME
-
-    async def execute(self, state: AgentState, guild: discord.Guild) -> dict:
-        action_name = _find_action(state, NAME)
-        if not action_name:
-            return {"success": False, "action": "none", "details": "No matching todo found."}
-
-        handler = ACTION_HANDLERS.get(action_name)
-        if not handler:
-            return {"success": False, "action": action_name, "details": f"Unknown action: {action_name}"}
-
-        params = next(
-            (t["params"] for t in state["todos"] if t.get("agent") == NAME and t.get("action") == action_name),
-            {},
-        )
-
-        try:
-            return await getattr(self, f"_do_{action_name}")(guild, params)
-        except discord.Forbidden:
-            return {"success": False, "action": action_name, "details": "Missing permissions."}
-        except discord.NotFound:
-            return {"success": False, "action": action_name, "details": "Rule not found."}
-        except HTTPException as exc:
-            return {"success": False, "action": action_name, "details": f"API error: {exc.text}"}
 
     async def _do_create_rule(self, guild: discord.Guild, params: dict) -> dict:
         trigger = _build_trigger(params.get("trigger_type", "keyword"), params.get("trigger_metadata"))

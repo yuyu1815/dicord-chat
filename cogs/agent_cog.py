@@ -1,9 +1,6 @@
 import asyncio
-import hashlib
-import json
 import logging
 import uuid
-from typing import Any
 
 import aiosqlite
 import discord
@@ -11,28 +8,26 @@ from discord.ext import commands
 
 from agents.base import BaseAgent, ExecutionAgent, InvestigationAgent
 from agents.registry import load_agent_module
+from formatters.response import (
+    compute_todos_hash,
+    format_execution_candidates,
+    format_final_response,
+    format_results,
+    split_message,
+)
 from graph.state import AgentState
 
 logger = logging.getLogger("discord_bot")
 
 APPROVAL_TIMEOUT = 300
 
-
-def _compute_todos_hash(todos: list[dict[str, Any]]) -> str:
-    """承認対象タスクリストの整合性チェック用ハッシュを計算する。
-
-    Args:
-        todos: 凍結された実行タスクリスト。
-
-    Returns:
-        SHA-256 16進数ダイジェスト文字列（先頭16文字）。
-    """
-    payload = json.dumps(todos, sort_keys=True, separators=(",", ":"))
-    return hashlib.sha256(payload.encode()).hexdigest()[:16]
-
-
-# Backward-compatible alias for existing tests and external references.
+# Backward-compatible aliases for existing tests and external references.
 _load_agent_module = load_agent_module
+_compute_todos_hash = compute_todos_hash
+_format_final_response = format_final_response
+_format_results = format_results
+_format_execution_candidates = format_execution_candidates
+_split_message = split_message
 
 
 class ApprovalView(discord.ui.View):
@@ -71,7 +66,7 @@ class ApprovalView(discord.ui.View):
     async def _save_approval(self, approved: bool) -> None:
         """承認結果をデータベースに保存する。"""
         proposed_todos = self.state.get("proposed_todos", [])
-        todos_hash = _compute_todos_hash(proposed_todos)
+        todos_hash = compute_todos_hash(proposed_todos)
         db_path = self.bot.config.get("database_url", "database/bot.db").replace("sqlite:///", "")
         async with aiosqlite.connect(db_path) as db:
             await db.execute(
@@ -89,7 +84,7 @@ class ApprovalView(discord.ui.View):
         Returns:
             照合成功時は ``True``。
         """
-        current_hash = _compute_todos_hash(self.state.get("proposed_todos", []))
+        current_hash = compute_todos_hash(self.state.get("proposed_todos", []))
         db_path = self.bot.config.get("database_url", "database/bot.db").replace("sqlite:///", "")
         try:
             async with aiosqlite.connect(db_path) as db:
@@ -146,8 +141,8 @@ class ApprovalView(discord.ui.View):
         if not channel or not isinstance(channel, discord.TextChannel):
             return
 
-        formatted = _format_final_response(final_state)
-        for chunk in _split_message(formatted, max_length=1900):
+        formatted = format_final_response(final_state)
+        for chunk in split_message(formatted, max_length=1900):
             await channel.send(chunk)
 
     async def _handle_rejected(self) -> None:
@@ -169,7 +164,7 @@ class ApprovalView(discord.ui.View):
             return
 
         final_response = final_state.get("final_response", "Request cancelled.")
-        for chunk in _split_message(final_response, max_length=1900):
+        for chunk in split_message(final_response, max_length=1900):
             await channel.send(chunk)
 
 
@@ -213,12 +208,12 @@ class AgentCog(commands.Cog):
 
         if plan_status == "error":
             error_msg = error or "An error occurred during planning."
-            for chunk in _split_message(f"**Error:** {error_msg}", max_length=1900):
+            for chunk in split_message(f"**Error:** {error_msg}", max_length=1900):
                 await ctx.send(chunk)
             return
 
         if plan_status == "done_no_execution":
-            investigation_text = _format_results(
+            investigation_text = format_results(
                 final_state.get("investigation_results", {}),
                 title="Investigation Results",
             )
@@ -228,16 +223,16 @@ class AgentCog(commands.Cog):
                 response_parts.append(investigation_text)
             response_parts.append(final_response)
             full_response = "\n".join(response_parts)
-            for chunk in _split_message(full_response, max_length=1900):
+            for chunk in split_message(full_response, max_length=1900):
                 await ctx.send(chunk)
             return
 
         # レスポンスを構築
-        investigation_text = _format_results(
+        investigation_text = format_results(
             final_state.get("investigation_results", {}),
             title="Investigation Results",
         )
-        execution_text = _format_execution_candidates(final_state.get("todos", []))
+        execution_text = format_execution_candidates(final_state.get("todos", []))
 
         response_parts = [f"**Request:** {request}\n"]
         if investigation_text:
@@ -251,123 +246,12 @@ class AgentCog(commands.Cog):
 
         if approval_required:
             view = ApprovalView(self.bot, final_state["approval_id"], final_state)
-            chunks = _split_message(full_response, max_length=1900)
+            chunks = split_message(full_response, max_length=1900)
             for chunk in chunks:
                 await ctx.send(chunk, view=view if chunk == chunks[-1] else None)
         else:
-            for chunk in _split_message(full_response, max_length=1900):
+            for chunk in split_message(full_response, max_length=1900):
                 await ctx.send(chunk)
-
-
-def _format_final_response(state: AgentState) -> str:
-    """最終状態からDiscord向けのレスポンスを構築する。
-
-    Args:
-        state: ワークフローの最終状態。
-
-    Returns:
-        フォーマットされた文字列。
-    """
-    parts = []
-
-    execution_results = state.get("execution_results", {})
-    if execution_results:
-        parts.append(_format_results(execution_results, title="Execution Results"))
-
-    final_response = state.get("final_response", "")
-    if final_response and final_response != "Done.":
-        parts.append(final_response)
-
-    return "\n".join(parts) if parts else "Done."
-
-
-def _format_results(results: dict[str, Any], title: str) -> str:
-    """調査/実行結果をDiscord向けにフォーマットする。
-
-    Args:
-        results: エージェントの実行結果。
-        title: セクションタイトル。
-
-    Returns:
-        フォーマットされた文字列。
-    """
-    if not results:
-        return ""
-
-    lines = [f"**{title}**\n"]
-    for key, value in results.items():
-        if isinstance(value, dict) and "error" in value:
-            lines.append(f"- {key}: ERROR - {value['error']}")
-            continue
-        lines.append(f"- {key}:")
-        if isinstance(value, list):
-            for item in value[:10]:
-                lines.append(f"  - {item}")
-            if len(value) > 10:
-                lines.append(f"  - ... and {len(value) - 10} more")
-        elif isinstance(value, dict):
-            denied = value.get("permission_denied", [])
-            if denied:
-                for d in denied:
-                    lines.append(f"  - :x: {d['action']}: {d['message']}")
-            for k, v in value.items():
-                if k == "permission_denied":
-                    continue
-                text = str(v)
-                if len(text) > 100:
-                    text = text[:100] + "..."
-                lines.append(f"  - {k}: {text}")
-
-    return "\n".join(lines)
-
-
-def _format_execution_candidates(todos: list[dict[str, Any]]) -> str:
-    """ユーザー確認用の実行候補リストをフォーマットする。
-
-    Args:
-        todos: 全タスクリスト。
-
-    Returns:
-        フォーマットされた文字列。
-    """
-    execution_todos = [t for t in todos if "investigation" not in t.get("agent", "")]
-    if not execution_todos:
-        return ""
-
-    lines = ["**Pending Execution (requires approval):**\n"]
-    for i, todo in enumerate(execution_todos, 1):
-        action = todo.get("action", "unknown")
-        params = todo.get("params", {})
-        agent = todo.get("agent", "unknown")
-        param_str = ", ".join(f"{k}={v}" for k, v in params.items())
-        lines.append(f"{i}. [{agent}] {action}({param_str})")
-
-    return "\n".join(lines)
-
-
-def _split_message(text: str, max_length: int = 1900) -> list[str]:
-    """Discordのメッセージ上限に合わせてテキストを分割する。
-
-    Args:
-        text: 分割対象の文字列。
-        max_length: チャンクの最大長。
-
-    Returns:
-        分割された文字列のリスト。
-    """
-    if len(text) <= max_length:
-        return [text]
-    chunks = []
-    while text:
-        if len(text) <= max_length:
-            chunks.append(text)
-            break
-        split_at = text.rfind("\n", 0, max_length)
-        if split_at == -1:
-            split_at = max_length
-        chunks.append(text[:split_at])
-        text = text[split_at:].lstrip("\n")
-    return chunks
 
 
 async def setup(bot: commands.Bot) -> None:

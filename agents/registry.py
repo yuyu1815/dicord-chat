@@ -11,7 +11,13 @@ import logging
 import pkgutil
 from typing import Any
 
-from agents.base import BaseAgent, ExecutionAgent, InvestigationAgent
+from agents.base import (
+    BaseAgent,
+    ExecutionAgent,
+    InvestigationAgent,
+    MultiActionExecutionAgent,
+    SingleActionExecutionAgent,
+)
 
 logger = logging.getLogger("discord_bot")
 
@@ -78,6 +84,8 @@ def load_agent_module(target: str, kind: str) -> BaseAgent | None:
                 and attr is not BaseAgent
                 and attr is not InvestigationAgent
                 and attr is not ExecutionAgent
+                and attr is not MultiActionExecutionAgent
+                and attr is not SingleActionExecutionAgent
             ):
                 return attr()
     except (ImportError, AttributeError) as e:

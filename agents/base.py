@@ -1,7 +1,10 @@
 from abc import ABC, abstractmethod
+import logging
 from typing import Any
 
 from graph.state import AgentState
+
+logger = logging.getLogger("discord_bot")
 
 
 def _find_action(state: AgentState, agent_name: str) -> str | None:
@@ -132,6 +135,109 @@ class ExecutionAgent(BaseAgent):
 
         Args:
             state: LangGraphワークフローの状態。
+            guild: 対象のDiscordサーバー。
+
+        Returns:
+            実行結果の辞書。
+        """
+
+
+class SingleActionExecutionAgent(ExecutionAgent):
+    """単一アクション実行エージェントのテンプレート基底クラス。
+
+    ``execute()`` メソッドを提供し、最初のマッチするtodoを検索して
+    ``_do_<action>`` メソッドにディスパッチする。サブクラスは以下を定義する：
+
+    * ``name`` プロパティ
+    * ``ACTION_HANDLERS`` クラス変数 (action名 -> 説明の辞書)
+    * ``_do_<action>(guild, params)`` メソッド群
+
+    Attributes:
+        not_found_message: ``discord.NotFound`` 時の詳細メッセージ。
+    """
+
+    single_action: bool = True
+    ACTION_HANDLERS: dict[str, str] = {}
+    not_found_message: str = "Target not found."
+
+    async def execute(self, state: AgentState, guild: Any) -> dict[str, Any]:
+        action_name = _find_action(state, self.name)
+        if not action_name:
+            return {"success": False, "action": "none", "details": "No matching todo found."}
+
+        if action_name not in self.ACTION_HANDLERS:
+            return {"success": False, "action": action_name, "details": f"Unknown action: {action_name}"}
+
+        params = next(
+            (t["params"] for t in state["todos"] if t.get("agent") == self.name and t.get("action") == action_name),
+            {},
+        )
+
+        try:
+            return await getattr(self, f"_do_{action_name}")(guild, params)
+        except PermissionError:
+            raise
+        except Exception as exc:
+            return self._handle_error(exc, action_name)
+
+    def _handle_error(self, exc: Exception, action_name: str) -> dict[str, Any]:
+        """例外を結果辞書に変換する。
+
+        Args:
+            exc: 発生した例外。
+            action_name: 実行中のアクション名。
+
+        Returns:
+            エラー結果の辞書。
+        """
+        import discord
+        from discord import HTTPException
+
+        if isinstance(exc, discord.Forbidden):
+            return {"success": False, "action": action_name, "details": "Missing permissions."}
+        if isinstance(exc, discord.NotFound):
+            return {"success": False, "action": action_name, "details": self.not_found_message}
+        if isinstance(exc, HTTPException):
+            return {"success": False, "action": action_name, "details": f"API error: {exc.text}"}
+        logger.warning("Unexpected error in %s/%s: %s", self.name, action_name, exc)
+        return {"success": False, "action": action_name, "details": f"Unexpected error: {exc}"}
+
+
+class MultiActionExecutionAgent(ExecutionAgent):
+    """複数アクション実行エージェントのテンプレート基底クラス。
+
+    ``execute()`` メソッドを提供し、ブロックされていない全todoを反復処理し、
+    ``_dispatch()`` メソッドで各アクションのハンドラに振り分ける。
+    サブクラスは以下を定義する：
+
+    * ``name`` プロパティ
+    * ``_dispatch(action, params, guild)`` メソッド
+    """
+
+    async def execute(self, state: AgentState, guild: Any) -> dict[str, Any]:
+        todos = state.get("todos", [])
+        my_todos = [t for t in todos if t.get("agent") == self.name and not t.get("_blocked")]
+        if not my_todos:
+            return {"success": False, "action": "none", "details": "No matching action found"}
+
+        results = []
+        for todo in my_todos:
+            action = todo.get("action", "")
+            params = todo.get("params", {})
+            result = await self._dispatch(action, params, guild)
+            results.append(result)
+
+        details = "; ".join(r["details"] for r in results)
+        all_ok = all(r["success"] for r in results)
+        return {"success": all_ok, "action": ", ".join(r["action"] for r in results), "details": details}
+
+    @abstractmethod
+    async def _dispatch(self, action: str, params: dict, guild: Any) -> dict[str, Any]:
+        """アクション名に対応するハンドラに振り分ける。
+
+        Args:
+            action: アクション名。
+            params: アクションのパラメータ。
             guild: 対象のDiscordサーバー。
 
         Returns:

@@ -1,9 +1,113 @@
 from typing import Any, Literal
 
-import discord
-
 from typing_extensions import TypedDict
 
+
+# ---------------------------------------------------------------------------
+# Agent-kind classification
+# ---------------------------------------------------------------------------
+
+AgentKind = Literal["investigation", "execution"]
+
+
+def classify_agent_kind(agent_name: str) -> AgentKind | None:
+    """エージェント名から種別（investigation / execution）を判定する。
+
+    Args:
+        agent_name: ``"channel_investigation"`` や ``"role_execution"`` 等。
+
+    Returns:
+        ``"investigation"`` または ``"execution"``。判定不能な場合は ``None``。
+    """
+    if agent_name.endswith("_investigation"):
+        return "investigation"
+    if agent_name.endswith("_execution"):
+        return "execution"
+    return None
+
+
+def agent_target_from_name(agent_name: str) -> str:
+    """エージェント名からターゲット部分を取り出す。
+
+    例: ``"channel_investigation"`` -> ``"channel"``
+
+    Args:
+        agent_name: エージェント名。
+
+    Returns:
+        ターゲット文字列。変換できない場合はそのまま返す。
+    """
+    for suffix in ("_investigation", "_execution"):
+        if agent_name.endswith(suffix):
+            return agent_name[: -len(suffix)]
+    return agent_name
+
+
+# ---------------------------------------------------------------------------
+# Todo helpers
+# ---------------------------------------------------------------------------
+
+class Todo(TypedDict, total=False):
+    """ワークフロー内の単一タスク項目。
+
+    Attributes:
+        agent: エージェント名（例: ``"channel_execution"``）。
+        action: 実行アクション名。
+        params: アクションに渡すパラメータ。
+        _blocked: 内部で権限不足を示すフラグ。
+    """
+    agent: str
+    action: str
+    params: dict[str, Any]
+    _blocked: bool
+
+
+def is_execution_todo(todo: Todo) -> bool:
+    """todoが実行タスクかどうかを判定する。
+
+    ``todo["agent"]`` に ``"investigation"`` を含まない場合に ``True``。
+
+    Args:
+        todo: 判定対象のタスク辞書。
+
+    Returns:
+        実行タスクの場合 ``True``。
+    """
+    return "investigation" not in todo.get("agent", "")
+
+
+def is_investigation_todo(todo: Todo) -> bool:
+    """todoが調査タスクかどうかを判定する。
+
+    Args:
+        todo: 判定対象のタスク辞書。
+
+    Returns:
+        調査タスクの場合 ``True``。
+    """
+    return "investigation" in todo.get("agent", "")
+
+
+# ---------------------------------------------------------------------------
+# Planner decision status constants
+# ---------------------------------------------------------------------------
+
+PLANNER_STATUS_NEED_INVESTIGATION: Literal["need_investigation"] = "need_investigation"
+PLANNER_STATUS_READY_FOR_APPROVAL: Literal["ready_for_approval"] = "ready_for_approval"
+PLANNER_STATUS_DONE_NO_EXECUTION: Literal["done_no_execution"] = "done_no_execution"
+PLANNER_STATUS_ERROR: Literal["error"] = "error"
+
+VALID_PLANNER_STATUSES: frozenset[str] = frozenset({
+    PLANNER_STATUS_NEED_INVESTIGATION,
+    PLANNER_STATUS_READY_FOR_APPROVAL,
+    PLANNER_STATUS_DONE_NO_EXECUTION,
+    PLANNER_STATUS_ERROR,
+})
+
+
+# ---------------------------------------------------------------------------
+# Workflow state
+# ---------------------------------------------------------------------------
 
 class AgentState(TypedDict, total=False):
     """LangGraphワークフローの状態。
@@ -46,7 +150,7 @@ class AgentState(TypedDict, total=False):
     bot: Any
 
     # 処理中
-    todos: list[dict[str, Any]]
+    todos: list[Todo]
     investigation_results: dict[str, Any]
 
     # 承認
@@ -70,10 +174,10 @@ class AgentState(TypedDict, total=False):
     max_planning_iterations: int
     planner_decision: dict[str, Any]
     planning_history: list[dict[str, Any]]
-    pending_investigation_todos: list[dict[str, Any]]
+    pending_investigation_todos: list[Todo]
     completed_investigation_agents: list[str]
-    draft_todos: list[dict[str, Any]]
-    proposed_todos: list[dict[str, Any]]
+    draft_todos: list[Todo]
+    proposed_todos: list[Todo]
     todos_version: int
     approval_required: bool
     approval_status: Literal["pending", "approved", "rejected", "none"]

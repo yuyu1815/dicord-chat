@@ -11,7 +11,16 @@ from agents.registry import (
     INVESTIGATION_TARGETS,
     get_execution_agent_names,
 )
-from graph.state import AgentState
+from graph.state import (
+    VALID_PLANNER_STATUSES,
+    AgentState,
+    PLANNER_STATUS_DONE_NO_EXECUTION,
+    PLANNER_STATUS_ERROR,
+    PLANNER_STATUS_NEED_INVESTIGATION,
+    PLANNER_STATUS_READY_FOR_APPROVAL,
+    Todo,
+    agent_target_from_name,
+)
 
 logger = logging.getLogger("discord_bot")
 
@@ -163,7 +172,7 @@ class MainAgent:
             logger.error("Failed to parse request with LLM: %s", e)
             return {"investigation_targets": [], "execution_candidates": [], "todos": []}
 
-    def build_todos(self, parsed: dict[str, Any]) -> list[dict[str, Any]]:
+    def build_todos(self, parsed: dict[str, Any]) -> list[Todo]:
         """LLMの解析結果を構造化されたタスクリストに変換する。
 
         Args:
@@ -172,7 +181,7 @@ class MainAgent:
         Returns:
             各タスクのエージェント名・アクション・パラメータを含むリスト。
         """
-        todos: list[dict[str, Any]] = []
+        todos: list[Todo] = []
         for target in parsed.get("investigation_targets", []):
             todos.append({"agent": f"{target}_investigation", "action": "investigate", "params": {}})
         for candidate in parsed.get("execution_candidates", []):
@@ -248,7 +257,7 @@ class MainAgent:
 
     def build_investigation_todos(
         self, targets: list[str], state: AgentState,
-    ) -> list[dict[str, Any]]:
+    ) -> list[Todo]:
         """調査対象のリストから調査タスクリストを生成する。
 
         既に完了済みの調査はスキップする。
@@ -261,7 +270,7 @@ class MainAgent:
             調査タスクリスト。
         """
         completed = set(state.get("completed_investigation_agents", []))
-        todos: list[dict[str, Any]] = []
+        todos: list[Todo] = []
         for target in targets:
             agent_name = f"{target}_investigation"
             if agent_name not in completed and target in INVESTIGATION_TARGETS:
@@ -274,7 +283,7 @@ class MainAgent:
 
     def build_execution_todos(
         self, candidates: list[dict[str, Any]],
-    ) -> list[dict[str, Any]]:
+    ) -> list[Todo]:
         """実行候補のリストから実行タスクリストを生成する。
 
         Args:
@@ -285,10 +294,10 @@ class MainAgent:
         """
         if not isinstance(candidates, list):
             return []
-        todos: list[dict[str, Any]] = []
+        todos: list[Todo] = []
         for candidate in candidates:
             agent = candidate.get("agent", "")
-            target = agent.replace("_execution", "")
+            target = agent_target_from_name(agent)
             if target in EXECUTION_TARGETS and agent.endswith("_execution"):
                 todos.append({
                     "agent": agent,
@@ -307,11 +316,11 @@ def _validate_planner_decision(decision: dict[str, Any]) -> dict[str, Any]:
     Returns:
         検証済みの判断辞書。
     """
-    valid_statuses = {"need_investigation", "ready_for_approval", "done_no_execution", "error"}
-    status = decision.get("status", "error")
+    valid_statuses = VALID_PLANNER_STATUSES
+    status = decision.get("status", PLANNER_STATUS_ERROR)
 
     if status not in valid_statuses:
-        status = "error"
+        status = PLANNER_STATUS_ERROR
 
     targets = decision.get("investigation_targets", [])
     if not isinstance(targets, list):
@@ -327,12 +336,12 @@ def _validate_planner_decision(decision: dict[str, Any]) -> dict[str, Any]:
 
     summary = decision.get("summary", "")
 
-    if status == "ready_for_approval" and not candidates:
-        status = "error"
+    if status == PLANNER_STATUS_READY_FOR_APPROVAL and not candidates:
+        status = PLANNER_STATUS_ERROR
         summary = summary or "No execution candidates provided for approval."
 
-    if status == "need_investigation" and not targets:
-        status = "error"
+    if status == PLANNER_STATUS_NEED_INVESTIGATION and not targets:
+        status = PLANNER_STATUS_ERROR
         summary = summary or "No investigation targets specified."
 
     return {

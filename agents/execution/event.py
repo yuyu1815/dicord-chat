@@ -1,22 +1,19 @@
 import datetime
 
 import discord
-from discord import HTTPException
 
-from agents.base import ExecutionAgent, _find_action
+from agents.base import SingleActionExecutionAgent
 from graph.state import AgentState
 
 NAME = "event_execution"
 
-ACTION_HANDLERS: dict[str, str] = {
-    "create": "Create scheduled event",
-    "edit": "Edit scheduled event",
-    "delete": "Delete scheduled event",
-}
 
-
-class EventExecutionAgent(ExecutionAgent):
-    single_action: bool = True
+class EventExecutionAgent(SingleActionExecutionAgent):
+    ACTION_HANDLERS: dict[str, str] = {
+        "create": "Create scheduled event",
+        "edit": "Edit scheduled event",
+        "delete": "Delete scheduled event",
+    }
 
     ACTION_PERMISSIONS: dict[str, list[str]] = {
         "create": ["manage_events"],
@@ -24,32 +21,11 @@ class EventExecutionAgent(ExecutionAgent):
         "delete": ["manage_events"],
     }
 
+    not_found_message: str = "Event not found."
+
     @property
     def name(self) -> str:
         return NAME
-
-    async def execute(self, state: AgentState, guild: discord.Guild) -> dict:
-        action_name = _find_action(state, NAME)
-        if not action_name:
-            return {"success": False, "action": "none", "details": "No matching todo found."}
-
-        handler = ACTION_HANDLERS.get(action_name)
-        if not handler:
-            return {"success": False, "action": action_name, "details": f"Unknown action: {action_name}"}
-
-        params = next(
-            (t["params"] for t in state["todos"] if t.get("agent") == NAME and t.get("action") == action_name),
-            {},
-        )
-
-        try:
-            return await getattr(self, f"_do_{action_name}")(guild, params)
-        except discord.Forbidden:
-            return {"success": False, "action": action_name, "details": "Missing permissions."}
-        except discord.NotFound:
-            return {"success": False, "action": action_name, "details": "Event not found."}
-        except HTTPException as exc:
-            return {"success": False, "action": action_name, "details": f"API error: {exc.text}"}
 
     def _parse_event_type(self, raw: str | None) -> discord.EntityType:
         type_map = {

@@ -1,10 +1,10 @@
 import discord
 
-from agents.base import ExecutionAgent
+from agents.base import MultiActionExecutionAgent
 from graph.state import AgentState
 
 
-class ThreadExecutionAgent(ExecutionAgent):
+class ThreadExecutionAgent(MultiActionExecutionAgent):
     """スレッドの作成・編集・アーカイブ・ロック・メンバー管理を行うエージェント。"""
 
     ACTION_PERMISSIONS: dict[str, list[str]] = {
@@ -19,24 +19,6 @@ class ThreadExecutionAgent(ExecutionAgent):
     @property
     def name(self) -> str:
         return "thread_execution"
-
-    async def execute(self, state: AgentState, guild: discord.Guild) -> dict:
-        """スレッド関連の操作を実行する。"""
-        todos = state.get("todos", [])
-        my_todos = [t for t in todos if t.get("agent") == self.name and not t.get("_blocked")]
-        if not my_todos:
-            return {"success": False, "action": "none", "details": "No matching action found"}
-
-        results = []
-        for todo in my_todos:
-            action = todo.get("action", "")
-            params = todo.get("params", {})
-            result = await self._dispatch(action, params, guild)
-            results.append(result)
-
-        details = "; ".join(r["details"] for r in results)
-        all_ok = all(r["success"] for r in results)
-        return {"success": all_ok, "action": ", ".join(r["action"] for r in results), "details": details}
 
     async def _dispatch(self, action: str, params: dict, guild: discord.Guild) -> dict:
         handlers = {
