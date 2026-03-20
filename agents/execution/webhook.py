@@ -78,5 +78,14 @@ class WebhookExecutionAgent(SingleActionExecutionAgent):
                     embeds.append(discord.Embed.from_dict(e))
             kwargs["embeds"] = embeds
 
+        files = []
+        for file_info in params.get("files", []):
+            if isinstance(file_info, str):
+                files.append(discord.File(file_info))
+            elif isinstance(file_info, dict):
+                files.append(discord.File(file_info["path"], filename=file_info.get("filename")))
+        if files:
+            kwargs["files"] = files
+
         await webhook.send(**kwargs)
         return {"success": True, "action": "execute", "details": t("exec.webhook.executed", locale=self._locale, id=params['webhook_id'])}

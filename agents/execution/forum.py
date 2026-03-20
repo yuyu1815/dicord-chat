@@ -15,6 +15,9 @@ class ForumExecutionAgent(MultiActionExecutionAgent):
         "create_tag": ["manage_channels"],
         "edit_tag": ["manage_channels"],
         "delete_tag": ["manage_channels"],
+        "create_channel": ["manage_channels"],
+        "edit_channel": ["manage_channels"],
+        "delete_channel": ["manage_channels"],
     }
 
     @property
@@ -29,6 +32,9 @@ class ForumExecutionAgent(MultiActionExecutionAgent):
             "create_tag": self._create_tag,
             "edit_tag": self._edit_tag,
             "delete_tag": self._delete_tag,
+            "create_channel": self._create_channel,
+            "edit_channel": self._edit_channel,
+            "delete_channel": self._delete_channel,
         }
         handler = handlers.get(action)
         if not handler:
@@ -192,3 +198,71 @@ class ForumExecutionAgent(MultiActionExecutionAgent):
             return {"success": True, "action": "delete_tag", "details": t("exec.forum.tag_deleted", locale=self._locale, name=tag_name)}
         except (discord.Forbidden, discord.HTTPException) as e:
             return {"success": False, "action": "delete_tag", "details": str(e)}
+
+    async def _create_channel(self, params: dict, guild: discord.Guild) -> dict:
+        """フォーラムチャンネルを作成する。"""
+        name = params.get("name")
+        if not name:
+            return {"success": False, "action": "create_channel", "details": t("exec.missing_param", locale=self._locale, param="name")}
+
+        category = None
+        category_id = params.get("category_id")
+        if category_id:
+            category = guild.get_channel(category_id)
+            if not category:
+                return {"success": False, "action": "create_channel", "details": t("not_found.channel", locale=self._locale, id=category_id)}
+
+        topic = params.get("topic")
+        try:
+            channel = await guild.create_forum_channel(name=name, category=category, topic=topic)
+            return {"success": True, "action": "create_channel", "details": t("exec.forum.channel_created", locale=self._locale, name=channel.name, id=channel.id)}
+        except (discord.Forbidden, discord.HTTPException) as e:
+            return {"success": False, "action": "create_channel", "details": str(e)}
+
+    async def _edit_channel(self, params: dict, guild: discord.Guild) -> dict:
+        """フォーラムチャンネルを編集する。"""
+        channel_id = params.get("channel_id")
+        if not channel_id:
+            return {"success": False, "action": "edit_channel", "details": t("exec.missing_param", locale=self._locale, param="channel_id")}
+
+        channel = guild.get_channel(channel_id)
+        if not channel:
+            return {"success": False, "action": "edit_channel", "details": t("not_found.channel", locale=self._locale, id=channel_id)}
+        if not isinstance(channel, discord.ForumChannel):
+            return {"success": False, "action": "edit_channel", "details": t("not_found.forum_channel", locale=self._locale, id=channel_id)}
+
+        kwargs: dict = {}
+        if "name" in params:
+            kwargs["name"] = params["name"]
+        if "topic" in params:
+            kwargs["topic"] = params["topic"]
+        if "slowmode" in params:
+            kwargs["slowmode_delay"] = params["slowmode"]
+
+        if not kwargs:
+            return {"success": False, "action": "edit_channel", "details": t("exec.no_editable_params", locale=self._locale)}
+
+        try:
+            await channel.edit(**kwargs)
+            return {"success": True, "action": "edit_channel", "details": t("exec.forum.channel_edited", locale=self._locale, name=channel.name)}
+        except (discord.Forbidden, discord.HTTPException) as e:
+            return {"success": False, "action": "edit_channel", "details": str(e)}
+
+    async def _delete_channel(self, params: dict, guild: discord.Guild) -> dict:
+        """フォーラムチャンネルを削除する。"""
+        channel_id = params.get("channel_id")
+        if not channel_id:
+            return {"success": False, "action": "delete_channel", "details": t("exec.missing_param", locale=self._locale, param="channel_id")}
+
+        channel = guild.get_channel(channel_id)
+        if not channel:
+            return {"success": False, "action": "delete_channel", "details": t("not_found.channel", locale=self._locale, id=channel_id)}
+        if not isinstance(channel, discord.ForumChannel):
+            return {"success": False, "action": "delete_channel", "details": t("not_found.forum_channel", locale=self._locale, id=channel_id)}
+
+        channel_name = channel.name
+        try:
+            await channel.delete()
+            return {"success": True, "action": "delete_channel", "details": t("exec.forum.channel_deleted", locale=self._locale, name=channel_name)}
+        except (discord.Forbidden, discord.HTTPException) as e:
+            return {"success": False, "action": "delete_channel", "details": str(e)}

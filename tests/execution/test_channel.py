@@ -170,3 +170,60 @@ def test_action_permissions_defined():
     assert "create" in agent.ACTION_PERMISSIONS
     assert "delete" in agent.ACTION_PERMISSIONS
     assert "manage_channels" in agent.ACTION_PERMISSIONS["create"]
+
+
+@pytest.mark.asyncio
+async def test_clone_channel(mock_guild, approved_state, mock_text_channel):
+    # Arrange
+    agent = ChannelExecutionAgent()
+    approved_state["todos"] = [{"agent": "channel_execution", "action": "clone", "params": {"channel_id": 4001}}]
+    mock_text_channel.id = 4001
+    mock_text_channel.name = "original"
+    cloned_channel = MagicMock()
+    cloned_channel.name = "original"
+    cloned_channel.id = 7001
+    mock_text_channel.clone = AsyncMock(return_value=cloned_channel)
+    mock_guild.get_channel = MagicMock(return_value=mock_text_channel)
+
+    # Act
+    result = await agent.execute(approved_state, mock_guild)
+
+    # Assert
+    assert result["success"] is True
+    assert "Cloned" in result["details"]
+
+
+@pytest.mark.asyncio
+async def test_clone_channel_with_name(mock_guild, approved_state, mock_text_channel):
+    # Arrange
+    agent = ChannelExecutionAgent()
+    approved_state["todos"] = [{"agent": "channel_execution", "action": "clone", "params": {"channel_id": 4001, "name": "new-name"}}]
+    mock_text_channel.id = 4001
+    mock_text_channel.name = "original"
+    cloned_channel = MagicMock()
+    cloned_channel.name = "new-name"
+    cloned_channel.id = 7002
+    mock_text_channel.clone = AsyncMock(return_value=cloned_channel)
+    mock_guild.get_channel = MagicMock(return_value=mock_text_channel)
+
+    # Act
+    result = await agent.execute(approved_state, mock_guild)
+
+    # Assert
+    assert result["success"] is True
+    mock_text_channel.clone.assert_called_once_with(name="new-name")
+
+
+@pytest.mark.asyncio
+async def test_clone_channel_not_found(mock_guild, approved_state):
+    # Arrange
+    agent = ChannelExecutionAgent()
+    approved_state["todos"] = [{"agent": "channel_execution", "action": "clone", "params": {"channel_id": 99999}}]
+    mock_guild.get_channel = MagicMock(return_value=None)
+
+    # Act
+    result = await agent.execute(approved_state, mock_guild)
+
+    # Assert
+    assert result["success"] is False
+    assert "not found" in result["details"]

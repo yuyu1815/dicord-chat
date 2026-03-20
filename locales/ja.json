@@ -71,6 +71,7 @@
   "exec.channel.edited": "チャンネル #{name} を編集しました",
   "exec.channel.deleted": "チャンネル #{name} を削除しました",
   "exec.channel.reordered": "{count} チャンネルを並び替えました",
+  "exec.channel.cloned": "チャンネル #{name} を #{new_name} ({id}) にクローンしました",
   "exec.channel.missing_positions": "'channel_positions' パラメータが不足しています",
 
   "exec.emoji.not_found": "絵文字が見つかりません。",
@@ -91,6 +92,9 @@
   "exec.forum.tag_edited": "タグを '{data}' に編集しました",
   "exec.forum.tag_not_found": "タグ {id} がフォーラムに見つかりません",
   "exec.forum.tag_deleted": "タグ '{name}' を削除しました",
+  "exec.forum.channel_created": "フォーラムチャンネル #{name} ({id}) を作成しました",
+  "exec.forum.channel_edited": "フォーラムチャンネル #{name} を編集しました",
+  "exec.forum.channel_deleted": "フォーラムチャンネル #{name} を削除しました",
 
   "exec.invite.not_found": "招待リンクまたはチャンネルが見つかりません。",
   "exec.invite.no_channel": "利用可能なチャンネルがありません。",
@@ -110,6 +114,7 @@
   "exec.member.unbanned": "ユーザー {user_id} のBANを解除しました",
 
   "exec.message.sent": "#{channel} にメッセージを送信しました ({id})",
+  "exec.message.replied": "#{channel} のメッセージ {reply_id} に返信しました ({id})",
   "exec.message.edited": "メッセージ {id} を編集しました",
   "exec.message.deleted": "メッセージ {id} を削除しました",
   "exec.message.pinned": "#{channel} でメッセージ {id} をピン留めしました",
@@ -118,6 +123,8 @@
   "exec.message.reaction_removed": "メッセージ {id} からリアクション {emoji} を削除しました",
   "exec.message.reactions_cleared": "メッセージ {id} のすべてのリアクションを削除しました",
   "exec.message.bulk_deleted": "#{channel} で {count} 件のメッセージを一括削除しました",
+  "exec.message.crossposted": "#{channel} のメッセージ {id} を公開しました",
+  "exec.message.embeds_suppressed": "#{channel} のメッセージ {id} の埋め込みを非表示にしました",
   "exec.message.missing_multi_param": "'{param1}' または '{param2}' パラメータが不足しています",
   "exec.message.missing_required": "必要なパラメータが不足しています ({params})",
 
@@ -140,8 +147,16 @@
   "exec.server.verification_level": "認証レベルを {level} に設定しました",
   "exec.server.system_channel": "システムチャンネルを #{channel} に設定しました",
   "exec.server.rules_channel": "ルールチャンネルを #{channel} に設定しました",
+  "exec.server.public_updates_channel": "公開アップデートチャンネルを #{channel} に設定しました",
+  "exec.server.afk_channel": "AFKチャンネルを #{channel} に設定しました（タイムアウト: {timeout}秒）",
+  "exec.server.content_filter": "明示的コンテンツフィルターを {level} に設定しました",
+  "exec.server.notification_level": "デフォルト通知レベルを {level} に設定しました",
+  "exec.server.safety_alerts_channel": "セーフティアラートチャンネルを #{channel} に設定しました",
   "exec.server.banner_updated": "サーバーのバナーを更新しました",
+  "exec.server.icon_updated": "サーバーのアイコンを更新しました",
   "exec.server.invalid_level": "無効なレベル: {level}",
+  "exec.server.invalid_content_filter": "無効なコンテンツフィルターレベル: {level}",
+  "exec.server.invalid_notification_level": "無効な通知レベル: {level}",
   "exec.server.missing_banner": "'banner' パラメータが不足しています（画像データ）",
 
   "exec.stage.not_stage": "チャンネルがステージチャンネルではありません。",
@@ -164,9 +179,13 @@
   "exec.soundboard.deleted": "サウンドボードサウンド '{name}' を削除しました。",
 
   "exec.thread.created": "スレッド '{name}' ({id}) を作成しました",
+  "exec.thread.created_from_message": "メッセージ {message_id} からスレッド '{name}' ({id}) を作成しました",
   "exec.thread.edited": "スレッド '{name}' を編集しました",
   "exec.thread.deleted": "スレッド '{name}' を削除しました",
+  "exec.thread.archived": "スレッド '{name}' をアーカイブしました",
+  "exec.thread.locked": "スレッド '{name}' をロックしました",
   "exec.thread.member_added": "{member} をスレッド '{name}' に追加しました",
+  "exec.thread.member_removed": "{member} をスレッド '{name}' から削除しました",
   "exec.thread.joined": "スレッド '{name}' に参加しました",
   "exec.thread.left": "スレッド '{name}' から退出しました",
 
@@ -188,6 +207,12 @@
   "exec.automod.rule_created": "AutoModルール '{name}' を作成しました。",
   "exec.automod.rule_edited": "AutoModルール '{name}' を編集しました。",
   "exec.automod.rule_deleted": "AutoModルール {id} を削除しました。",
+
+  "exec.poll.created": "#{channel} に投票を作成しました ({id})",
+  "exec.poll.ended": "#{channel} の投票 {id} を終了しました",
+  "exec.poll.missing_question": "'question' パラメータが不足しています",
+  "exec.poll.missing_answers": "'answers' パラメータが不足しています",
+  "exec.poll.not_a_poll": "メッセージは投票ではありません",
 
   "inv.member_not_found": "メンバー {id} がサーバーに見つかりません",
   "inv.member_no_permission": "メンバー {id} の取得に必要な権限がありません",

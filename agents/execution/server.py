@@ -16,6 +16,12 @@ class ServerExecutionAgent(MultiActionExecutionAgent):
         "edit_system_channel": ["manage_guild"],
         "edit_rules_channel": ["manage_guild"],
         "edit_banner": ["manage_guild"],
+        "edit_icon": ["manage_guild"],
+        "edit_public_updates_channel": ["manage_guild"],
+        "edit_afk": ["manage_guild"],
+        "edit_content_filter": ["manage_guild"],
+        "edit_notification_level": ["manage_guild"],
+        "edit_safety_alerts_channel": ["manage_guild"],
     }
 
     @property
@@ -30,6 +36,12 @@ class ServerExecutionAgent(MultiActionExecutionAgent):
             "edit_system_channel": self._edit_system_channel,
             "edit_rules_channel": self._edit_rules_channel,
             "edit_banner": self._edit_banner,
+            "edit_icon": self._edit_icon,
+            "edit_public_updates_channel": self._edit_public_updates_channel,
+            "edit_afk": self._edit_afk,
+            "edit_content_filter": self._edit_content_filter,
+            "edit_notification_level": self._edit_notification_level,
+            "edit_safety_alerts_channel": self._edit_safety_alerts_channel,
         }
         handler = handlers.get(action)
         if not handler:
@@ -117,3 +129,95 @@ class ServerExecutionAgent(MultiActionExecutionAgent):
             return {"success": True, "action": "edit_banner", "details": t("exec.server.banner_updated", locale=self._locale)}
         except (discord.Forbidden, discord.HTTPException) as e:
             return {"success": False, "action": "edit_banner", "details": str(e)}
+
+    async def _edit_icon(self, params: dict, guild: discord.Guild) -> dict:
+        """サーバーアイコンを変更する。"""
+        icon = params.get("icon")
+        if not icon:
+            return {"success": False, "action": "edit_icon", "details": t("exec.missing_param", locale=self._locale, param="icon")}
+        try:
+            await guild.edit(icon=icon)
+            return {"success": True, "action": "edit_icon", "details": t("exec.server.icon_updated", locale=self._locale)}
+        except (discord.Forbidden, discord.HTTPException) as e:
+            return {"success": False, "action": "edit_icon", "details": str(e)}
+
+    async def _edit_public_updates_channel(self, params: dict, guild: discord.Guild) -> dict:
+        """公開アップデートチャンネルを設定する。"""
+        channel_id = params.get("channel_id")
+        if not channel_id:
+            return {"success": False, "action": "edit_public_updates_channel", "details": t("exec.missing_param", locale=self._locale, param="channel_id")}
+        channel = guild.get_channel(channel_id)
+        if not channel:
+            return {"success": False, "action": "edit_public_updates_channel", "details": t("not_found.channel", locale=self._locale, id=channel_id)}
+        try:
+            await guild.edit(public_updates_channel=channel)
+            return {"success": True, "action": "edit_public_updates_channel", "details": t("exec.server.public_updates_channel", locale=self._locale, channel=channel.name)}
+        except (discord.Forbidden, discord.HTTPException) as e:
+            return {"success": False, "action": "edit_public_updates_channel", "details": str(e)}
+
+    async def _edit_afk(self, params: dict, guild: discord.Guild) -> dict:
+        """AFKチャンネルとタイムアウトを設定する。"""
+        channel_id = params.get("channel_id")
+        if not channel_id:
+            return {"success": False, "action": "edit_afk", "details": t("exec.missing_param", locale=self._locale, param="channel_id")}
+        channel = guild.get_channel(channel_id)
+        if not channel:
+            return {"success": False, "action": "edit_afk", "details": t("not_found.channel", locale=self._locale, id=channel_id)}
+        timeout = params.get("timeout", 300)
+        try:
+            await guild.edit(afk_channel=channel, afk_timeout=timeout)
+            return {"success": True, "action": "edit_afk", "details": t("exec.server.afk_channel", locale=self._locale, channel=channel.name, timeout=timeout)}
+        except (discord.Forbidden, discord.HTTPException) as e:
+            return {"success": False, "action": "edit_afk", "details": str(e)}
+
+    async def _edit_content_filter(self, params: dict, guild: discord.Guild) -> dict:
+        """明示的コンテンツフィルターレベルを変更する。"""
+        level_name = params.get("level")
+        if not level_name:
+            return {"success": False, "action": "edit_content_filter", "details": t("exec.missing_param", locale=self._locale, param="level")}
+        level_map = {
+            "disabled": discord.ContentFilter.disabled,
+            "no_role": discord.ContentFilter.no_role,
+            "members_without_roles": discord.ContentFilter.try_value,
+            "all_members": discord.ContentFilter.all_members,
+        }
+        level = level_map.get(level_name.lower())
+        if not level:
+            return {"success": False, "action": "edit_content_filter", "details": t("exec.server.invalid_content_filter", locale=self._locale, level=level_name)}
+        try:
+            await guild.edit(explicit_content_filter=level)
+            return {"success": True, "action": "edit_content_filter", "details": t("exec.server.content_filter", locale=self._locale, level=level_name)}
+        except (discord.Forbidden, discord.HTTPException) as e:
+            return {"success": False, "action": "edit_content_filter", "details": str(e)}
+
+    async def _edit_notification_level(self, params: dict, guild: discord.Guild) -> dict:
+        """デフォルト通知レベルを変更する。"""
+        level_name = params.get("level")
+        if not level_name:
+            return {"success": False, "action": "edit_notification_level", "details": t("exec.missing_param", locale=self._locale, param="level")}
+        level_map = {
+            "all_messages": discord.NotificationLevel.all_messages,
+            "only_mentions": discord.NotificationLevel.only_mentions,
+        }
+        level = level_map.get(level_name.lower())
+        if not level:
+            return {"success": False, "action": "edit_notification_level", "details": t("exec.server.invalid_notification_level", locale=self._locale, level=level_name)}
+        try:
+            await guild.edit(default_notifications=level)
+            return {"success": True, "action": "edit_notification_level", "details": t("exec.server.notification_level", locale=self._locale, level=level_name)}
+        except (discord.Forbidden, discord.HTTPException) as e:
+            return {"success": False, "action": "edit_notification_level", "details": str(e)}
+
+    async def _edit_safety_alerts_channel(self, params: dict, guild: discord.Guild) -> dict:
+        """セーフティアラートチャンネルを設定する。"""
+        channel_id = params.get("channel_id")
+        if not channel_id:
+            return {"success": False, "action": "edit_safety_alerts_channel", "details": t("exec.missing_param", locale=self._locale, param="channel_id")}
+        channel = guild.get_channel(channel_id)
+        if not channel:
+            return {"success": False, "action": "edit_safety_alerts_channel", "details": t("not_found.channel", locale=self._locale, id=channel_id)}
+        try:
+            await guild.edit(safety_alerts_channel=channel)
+            return {"success": True, "action": "edit_safety_alerts_channel", "details": t("exec.server.safety_alerts_channel", locale=self._locale, channel=channel.name)}
+        except (discord.Forbidden, discord.HTTPException) as e:
+            return {"success": False, "action": "edit_safety_alerts_channel", "details": str(e)}

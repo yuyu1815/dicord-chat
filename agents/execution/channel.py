@@ -12,6 +12,7 @@ class ChannelExecutionAgent(MultiActionExecutionAgent):
         "edit": ["manage_channels"],
         "delete": ["manage_channels"],
         "reorder": ["manage_channels"],
+        "clone": ["manage_channels"],
     }
 
     @property
@@ -24,6 +25,7 @@ class ChannelExecutionAgent(MultiActionExecutionAgent):
             "edit": self._edit,
             "delete": self._delete,
             "reorder": self._reorder,
+            "clone": self._clone,
         }
         handler = handlers.get(action)
         if not handler:
@@ -131,3 +133,17 @@ class ChannelExecutionAgent(MultiActionExecutionAgent):
             return {"success": True, "action": "reorder", "details": t("exec.channel.reordered", locale=self._locale, count=len(positions))}
         except (discord.Forbidden, discord.HTTPException) as e:
             return {"success": False, "action": "reorder", "details": str(e)}
+
+    async def _clone(self, params: dict, guild: discord.Guild) -> dict:
+        """チャンネルを複製する。"""
+        channel_id = params.get("channel_id")
+        if not channel_id:
+            return {"success": False, "action": "clone", "details": t("exec.missing_param", locale=self._locale, param="channel_id")}
+        channel = guild.get_channel(channel_id)
+        if not channel:
+            return {"success": False, "action": "clone", "details": t("not_found.channel", locale=self._locale, id=channel_id)}
+        try:
+            cloned = await channel.clone(name=params.get("name"))
+            return {"success": True, "action": "clone", "details": t("exec.channel.cloned", locale=self._locale, name=channel.name, new_name=cloned.name, id=cloned.id)}
+        except (discord.Forbidden, discord.HTTPException) as e:
+            return {"success": False, "action": "clone", "details": str(e)}

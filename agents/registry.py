@@ -29,14 +29,14 @@ INVESTIGATION_TARGETS: list[str] = [
     "server", "channel", "category", "thread", "forum",
     "message", "role", "permission", "member", "vc",
     "stage", "event", "automod", "invite", "webhook",
-    "emoji", "sticker", "soundboard", "audit_log",
+    "emoji", "sticker", "soundboard", "audit_log", "poll",
 ]
 
 EXECUTION_TARGETS: list[str] = [
     "server", "channel", "category", "thread", "forum",
     "message", "role", "permission", "member", "vc",
     "stage", "event", "automod", "invite", "webhook",
-    "emoji", "sticker", "soundboard",
+    "emoji", "sticker", "soundboard", "poll",
 ]
 
 

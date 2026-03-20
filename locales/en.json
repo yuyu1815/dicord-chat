@@ -71,6 +71,7 @@
   "exec.channel.edited": "Edited #{name}",
   "exec.channel.deleted": "Deleted #{name}",
   "exec.channel.reordered": "Reordered {count} channel(s)",
+  "exec.channel.cloned": "Cloned #{name} -> #{new_name} ({id})",
   "exec.channel.missing_positions": "Missing 'channel_positions' parameter",
 
   "exec.emoji.not_found": "Emoji not found.",
@@ -91,6 +92,9 @@
   "exec.forum.tag_edited": "Edited tag to '{data}'",
   "exec.forum.tag_not_found": "Tag {id} not found in forum",
   "exec.forum.tag_deleted": "Deleted tag '{name}'",
+  "exec.forum.channel_created": "Created forum channel #{name} ({id})",
+  "exec.forum.channel_edited": "Edited forum channel #{name}",
+  "exec.forum.channel_deleted": "Deleted forum channel #{name}",
 
   "exec.invite.not_found": "Invite or channel not found.",
   "exec.invite.no_channel": "No channel available.",
@@ -110,6 +114,7 @@
   "exec.member.unbanned": "Unbanned user {user_id}",
 
   "exec.message.sent": "Sent message in #{channel} ({id})",
+  "exec.message.replied": "Replied to message {reply_id} in #{channel} ({id})",
   "exec.message.edited": "Edited message {id}",
   "exec.message.deleted": "Deleted message {id}",
   "exec.message.pinned": "Pinned message {id} in #{channel}",
@@ -118,6 +123,8 @@
   "exec.message.reaction_removed": "Removed reaction {emoji} from message {id}",
   "exec.message.reactions_cleared": "Cleared all reactions from message {id}",
   "exec.message.bulk_deleted": "Bulk deleted {count} message(s) in #{channel}",
+  "exec.message.crossposted": "Crossposted message {id} from #{channel}",
+  "exec.message.embeds_suppressed": "Suppressed embeds on message {id} in #{channel}",
   "exec.message.missing_multi_param": "Missing '{param1}' or '{param2}' parameter",
   "exec.message.missing_required": "Missing required parameters ({params})",
 
@@ -140,8 +147,16 @@
   "exec.server.verification_level": "Verification level set to {level}",
   "exec.server.system_channel": "System channel set to #{channel}",
   "exec.server.rules_channel": "Rules channel set to #{channel}",
+  "exec.server.public_updates_channel": "Public updates channel set to #{channel}",
+  "exec.server.afk_channel": "AFK channel set to #{channel} (timeout: {timeout}s)",
+  "exec.server.content_filter": "Explicit content filter set to {level}",
+  "exec.server.notification_level": "Default notification level set to {level}",
+  "exec.server.safety_alerts_channel": "Safety alerts channel set to #{channel}",
   "exec.server.banner_updated": "Server banner updated",
+  "exec.server.icon_updated": "Server icon updated",
   "exec.server.invalid_level": "Invalid level: {level}",
+  "exec.server.invalid_content_filter": "Invalid content filter level: {level}",
+  "exec.server.invalid_notification_level": "Invalid notification level: {level}",
   "exec.server.missing_banner": "Missing 'banner' parameter (image bytes)",
 
   "exec.stage.not_stage": "Channel is not a StageChannel.",
@@ -164,9 +179,13 @@
   "exec.soundboard.deleted": "Deleted soundboard sound '{name}'.",
 
   "exec.thread.created": "Created thread '{name}' ({id})",
+  "exec.thread.created_from_message": "Created thread '{name}' ({id}) from message {message_id}",
   "exec.thread.edited": "Edited thread '{name}'",
   "exec.thread.deleted": "Deleted thread '{name}'",
+  "exec.thread.archived": "Archived thread '{name}'",
+  "exec.thread.locked": "Locked thread '{name}'",
   "exec.thread.member_added": "Added {member} to thread '{name}'",
+  "exec.thread.member_removed": "Removed {member} from thread '{name}'",
   "exec.thread.joined": "Joined thread '{name}'",
   "exec.thread.left": "Left thread '{name}'",
 
@@ -188,6 +207,12 @@
   "exec.automod.rule_created": "Created AutoMod rule '{name}'.",
   "exec.automod.rule_edited": "Edited AutoMod rule '{name}'.",
   "exec.automod.rule_deleted": "Deleted AutoMod rule {id}.",
+
+  "exec.poll.created": "Created poll in #{channel} ({id})",
+  "exec.poll.ended": "Ended poll {id} in #{channel}",
+  "exec.poll.missing_question": "Missing 'question' parameter",
+  "exec.poll.missing_answers": "Missing 'answers' parameter",
+  "exec.poll.not_a_poll": "Message is not a poll",
 
   "inv.member_not_found": "member {id} not found in guild",
   "inv.member_no_permission": "missing permissions to fetch member {id}",

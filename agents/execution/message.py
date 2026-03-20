@@ -18,6 +18,8 @@ class MessageExecutionAgent(MultiActionExecutionAgent):
         "remove_reaction": ["manage_messages"],
         "clear_reactions": ["manage_messages"],
         "bulk_delete": ["manage_messages"],
+        "crosspost": ["send_messages"],
+        "suppress_embeds": ["manage_messages"],
     }
 
     @property
@@ -35,6 +37,8 @@ class MessageExecutionAgent(MultiActionExecutionAgent):
             "remove_reaction": self._remove_reaction,
             "clear_reactions": self._clear_reactions,
             "bulk_delete": self._bulk_delete,
+            "crosspost": self._crosspost,
+            "suppress_embeds": self._suppress_embeds,
         }
         handler = handlers.get(action)
         if not handler:
@@ -66,7 +70,31 @@ class MessageExecutionAgent(MultiActionExecutionAgent):
                 files.append(discord.File(file_info["path"], filename=file_info.get("filename")))
 
         try:
-            message = await channel.send(content=content, embed=embed, files=files)
+            reference = None
+            message_id = params.get("message_id")
+            if message_id:
+                try:
+                    ref_message = await channel.fetch_message(message_id)
+                    reference = ref_message
+                except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                    return {"success": False, "action": "send", "details": t("not_found.message", locale=self._locale, id=message_id)}
+
+            stickers = []
+            for sid in params.get("stickers", []):
+                sticker = guild.get_sticker(sid)
+                if sticker is not None:
+                    stickers.append(sticker)
+
+            send_kwargs: dict = {"content": content, "embed": embed, "files": files}
+            send_kwargs["tts"] = params.get("tts", False)
+            if reference is not None:
+                send_kwargs["reference"] = reference
+            if stickers:
+                send_kwargs["stickers"] = stickers
+
+            message = await channel.send(**send_kwargs)
+            if reference is not None:
+                return {"success": True, "action": "send", "details": t("exec.message.replied", locale=self._locale, channel=channel.name, reply_id=message.id)}
             return {"success": True, "action": "send", "details": t("exec.message.sent", locale=self._locale, channel=channel.name, id=message.id)}
         except (discord.Forbidden, discord.HTTPException) as e:
             return {"success": False, "action": "send", "details": str(e)}
@@ -220,6 +248,46 @@ class MessageExecutionAgent(MultiActionExecutionAgent):
             return {"success": True, "action": "bulk_delete", "details": t("exec.message.bulk_deleted", locale=self._locale, count=len(message_ids), channel=channel.name)}
         except (discord.Forbidden, discord.NotFound, discord.HTTPException) as e:
             return {"success": False, "action": "bulk_delete", "details": str(e)}
+
+    async def _crosspost(self, params: dict, guild: discord.Guild) -> dict:
+        """メッセージをクロスポストする（アナウンスチャンネル）。"""
+        channel_id = params.get("channel_id")
+        message_id = params.get("message_id")
+        if not channel_id or not message_id:
+            return {"success": False, "action": "crosspost", "details": t("exec.message.missing_multi_param", locale=self._locale, param1="channel_id", param2="message_id")}
+
+        channel = guild.get_channel(channel_id)
+        if not channel:
+            return {"success": False, "action": "crosspost", "details": t("not_found.channel", locale=self._locale, id=channel_id)}
+
+        try:
+            message = await channel.fetch_message(message_id)
+            await message.crosspost()
+            return {"success": True, "action": "crosspost", "details": t("exec.message.crossposted", locale=self._locale, id=message.id, channel=channel.name)}
+        except discord.NotFound:
+            return {"success": False, "action": "crosspost", "details": t("not_found.message", locale=self._locale, id=message_id)}
+        except (discord.Forbidden, discord.HTTPException) as e:
+            return {"success": False, "action": "crosspost", "details": str(e)}
+
+    async def _suppress_embeds(self, params: dict, guild: discord.Guild) -> dict:
+        """メッセージの埋め込みを抑制または再有効化する。"""
+        channel_id = params.get("channel_id")
+        message_id = params.get("message_id")
+        if not channel_id or not message_id:
+            return {"success": False, "action": "suppress_embeds", "details": t("exec.message.missing_multi_param", locale=self._locale, param1="channel_id", param2="message_id")}
+
+        channel = guild.get_channel(channel_id)
+        if not channel:
+            return {"success": False, "action": "suppress_embeds", "details": t("not_found.channel", locale=self._locale, id=channel_id)}
+
+        try:
+            message = await channel.fetch_message(message_id)
+            await message.edit(suppress=params.get("suppress", True))
+            return {"success": True, "action": "suppress_embeds", "details": t("exec.message.embeds_suppressed", locale=self._locale, id=message.id, channel=channel.name)}
+        except discord.NotFound:
+            return {"success": False, "action": "suppress_embeds", "details": t("not_found.message", locale=self._locale, id=message_id)}
+        except (discord.Forbidden, discord.HTTPException) as e:
+            return {"success": False, "action": "suppress_embeds", "details": str(e)}
 
     async def _find_message(self, guild: discord.Guild, message_id: int) -> discord.Message | None:
         """サーバー内のチャンネル・スレッドからメッセージを検索する。"""

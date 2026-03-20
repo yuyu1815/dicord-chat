@@ -129,3 +129,54 @@ def test_action_permissions_defined():
     agent = WebhookExecutionAgent()
     assert "create" in agent.ACTION_PERMISSIONS
     assert "manage_webhooks" in agent.ACTION_PERMISSIONS["create"]
+
+
+@pytest.mark.asyncio
+async def test_execute_webhook_with_file(mock_guild, approved_state, tmp_path):
+    # Arrange
+    agent = WebhookExecutionAgent()
+    test_file = tmp_path / "test.txt"
+    test_file.write_text("hello")
+    approved_state["todos"] = [{"agent": "webhook_execution", "action": "execute", "params": {"webhook_id": 10001, "content": "With file", "files": [str(test_file)]}}]
+    webhook = MagicMock()
+    webhook.send = AsyncMock()
+    mock_bot = MagicMock()
+    mock_bot.fetch_webhook = AsyncMock(return_value=webhook)
+    approved_state["bot"] = mock_bot
+
+    # Act
+    result = await agent.execute(approved_state, mock_guild)
+
+    # Assert
+    assert result["success"] is True
+    assert "Executed webhook" in result["details"]
+    webhook.send.assert_called_once()
+    call_kwargs = webhook.send.call_args
+    assert "files" in call_kwargs.kwargs
+    assert len(call_kwargs.kwargs["files"]) == 1
+
+
+@pytest.mark.asyncio
+async def test_execute_webhook_with_multiple_files(mock_guild, approved_state, tmp_path):
+    # Arrange
+    agent = WebhookExecutionAgent()
+    file_a = tmp_path / "a.txt"
+    file_a.write_text("a")
+    file_b = tmp_path / "b.txt"
+    file_b.write_text("b")
+    approved_state["todos"] = [{"agent": "webhook_execution", "action": "execute", "params": {"webhook_id": 10001, "content": "Multi", "files": [{"path": str(file_a), "filename": "custom_a.txt"}, str(file_b)]}}]
+    webhook = MagicMock()
+    webhook.send = AsyncMock()
+    mock_bot = MagicMock()
+    mock_bot.fetch_webhook = AsyncMock(return_value=webhook)
+    approved_state["bot"] = mock_bot
+
+    # Act
+    result = await agent.execute(approved_state, mock_guild)
+
+    # Assert
+    assert result["success"] is True
+    webhook.send.assert_called_once()
+    call_kwargs = webhook.send.call_args
+    assert "files" in call_kwargs.kwargs
+    assert len(call_kwargs.kwargs["files"]) == 2
