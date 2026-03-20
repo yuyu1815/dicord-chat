@@ -56,6 +56,7 @@ async def test_soundboard_empty_list(mock_guild, empty_state):
     
     # Assert
     assert result["soundboard_sounds"] == []
+    assert result["total_count"] == 0
 
 
 @pytest.mark.asyncio

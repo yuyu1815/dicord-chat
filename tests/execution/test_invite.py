@@ -9,7 +9,7 @@ from graph.state import AgentState
 
 @pytest.fixture
 def approved_state():
-    return {"approved": True, "todos": [], "user_permissions": {}}
+    return {"approved": True, "todos": [], "user_permissions": {}, "bot": None}
 
 
 @pytest.mark.asyncio
@@ -75,8 +75,10 @@ async def test_delete_invite(mock_guild, approved_state):
     approved_state["todos"] = [{"agent": "invite_execution", "action": "delete", "params": {"invite_code": "abc123"}}]
     invite = MagicMock()
     invite.delete = AsyncMock()
-    mock_guild.fetch_invite = AsyncMock(return_value=invite)
-    
+    mock_bot = MagicMock()
+    mock_bot.fetch_invite = AsyncMock(return_value=invite)
+    approved_state["bot"] = mock_bot
+
     # Act
     result = await agent.execute(approved_state, mock_guild)
     

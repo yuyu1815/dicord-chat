@@ -58,6 +58,7 @@ async def test_sticker_empty_list(mock_guild, empty_state):
     
     # Assert
     assert result["stickers"] == []
+    assert result["total_count"] == 0
 
 
 @pytest.mark.asyncio

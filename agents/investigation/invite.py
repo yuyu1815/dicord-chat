@@ -23,7 +23,7 @@ class InviteInvestigationAgent(InvestigationAgent):
         """
         invites = await guild.invites()
         if not invites:
-            return {"invites": []}
+            return {"invites": [], "total_count": 0}
 
         serialized = []
         for invite in invites:
@@ -42,4 +42,4 @@ class InviteInvestigationAgent(InvestigationAgent):
                 "expires_at": invite.expires_at.isoformat() if invite.expires_at else None,
             })
 
-        return {"invites": serialized}
+        return {"invites": serialized, "total_count": len(serialized)}

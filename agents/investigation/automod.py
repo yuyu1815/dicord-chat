@@ -23,7 +23,7 @@ class AutoModInvestigationAgent(InvestigationAgent):
         """
         rules = await guild.fetch_automod_rules()
         if not rules:
-            return {"auto_moderation_rules": []}
+            return {"auto_moderation_rules": [], "total_count": 0}
 
         serialized = []
         for rule in rules:
@@ -62,4 +62,4 @@ class AutoModInvestigationAgent(InvestigationAgent):
                 "exempt_channels": [ch.name for ch in rule.exempt_channels],
             })
 
-        return {"auto_moderation_rules": serialized}
+        return {"auto_moderation_rules": serialized, "total_count": len(serialized)}

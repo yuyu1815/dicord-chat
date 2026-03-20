@@ -50,11 +50,8 @@ class VoiceChannelExecutionAgent(MultiActionExecutionAgent):
         category_id = params.get("category_id")
         category = guild.get_channel(category_id) if category_id else None
 
-        try:
-            channel = await guild.create_voice_channel(name=name, category=category)
-            return {"success": True, "action": "create", "details": t("exec.channel.created", locale=self._locale, name=channel.name, id=channel.id)}
-        except (discord.Forbidden, discord.HTTPException) as e:
-            return {"success": False, "action": "create", "details": str(e)}
+        channel = await guild.create_voice_channel(name=name, category=category)
+        return {"success": True, "action": "create", "details": t("exec.channel.created", locale=self._locale, name=channel.name, id=channel.id)}
 
     async def _delete(self, params: dict, guild: discord.Guild) -> dict:
         """ボイスチャンネルを削除する。"""
@@ -65,11 +62,8 @@ class VoiceChannelExecutionAgent(MultiActionExecutionAgent):
         if not channel:
             return {"success": False, "action": "delete", "details": t("not_found.channel", locale=self._locale, id=channel_id)}
         channel_name = channel.name
-        try:
-            await channel.delete()
-            return {"success": True, "action": "delete", "details": t("exec.channel.deleted", locale=self._locale, name=channel_name)}
-        except (discord.Forbidden, discord.HTTPException) as e:
-            return {"success": False, "action": "delete", "details": str(e)}
+        await channel.delete()
+        return {"success": True, "action": "delete", "details": t("exec.channel.deleted", locale=self._locale, name=channel_name)}
 
     async def _move_user(self, params: dict, guild: discord.Guild) -> dict:
         """メンバーをボイスチャンネルに移動させる。"""
@@ -88,11 +82,8 @@ class VoiceChannelExecutionAgent(MultiActionExecutionAgent):
         if not channel or not isinstance(channel, discord.VoiceChannel):
             return {"success": False, "action": "move_user", "details": t("not_found.voice_channel", locale=self._locale, id=channel_id)}
 
-        try:
-            await member.move_to(channel)
-            return {"success": True, "action": "move_user", "details": t("exec.vc.moved", locale=self._locale, member=member.display_name, channel=channel.name)}
-        except (discord.Forbidden, discord.HTTPException) as e:
-            return {"success": False, "action": "move_user", "details": str(e)}
+        await member.move_to(channel)
+        return {"success": True, "action": "move_user", "details": t("exec.vc.moved", locale=self._locale, member=member.display_name, channel=channel.name)}
 
     async def _mute(self, params: dict, guild: discord.Guild) -> dict:
         """メンバーをサーバーミュートにする。"""
@@ -104,11 +95,8 @@ class VoiceChannelExecutionAgent(MultiActionExecutionAgent):
         if not member:
             return {"success": False, "action": "mute", "details": t("not_found.member", locale=self._locale, id=user_id)}
 
-        try:
-            await member.edit(mute=True)
-            return {"success": True, "action": "mute", "details": t("exec.vc.muted", locale=self._locale, member=member.display_name)}
-        except (discord.Forbidden, discord.HTTPException) as e:
-            return {"success": False, "action": "mute", "details": str(e)}
+        await member.edit(mute=True)
+        return {"success": True, "action": "mute", "details": t("exec.vc.muted", locale=self._locale, member=member.display_name)}
 
     async def _unmute(self, params: dict, guild: discord.Guild) -> dict:
         """メンバーのサーバーミュートを解除する。"""
@@ -120,11 +108,8 @@ class VoiceChannelExecutionAgent(MultiActionExecutionAgent):
         if not member:
             return {"success": False, "action": "unmute", "details": t("not_found.member", locale=self._locale, id=user_id)}
 
-        try:
-            await member.edit(mute=False)
-            return {"success": True, "action": "unmute", "details": t("exec.vc.unmuted", locale=self._locale, member=member.display_name)}
-        except (discord.Forbidden, discord.HTTPException) as e:
-            return {"success": False, "action": "unmute", "details": str(e)}
+        await member.edit(mute=False)
+        return {"success": True, "action": "unmute", "details": t("exec.vc.unmuted", locale=self._locale, member=member.display_name)}
 
     async def _deafen(self, params: dict, guild: discord.Guild) -> dict:
         """メンバーをサーバー聴覚禁止にする。"""
@@ -136,11 +121,8 @@ class VoiceChannelExecutionAgent(MultiActionExecutionAgent):
         if not member:
             return {"success": False, "action": "deafen", "details": t("not_found.member", locale=self._locale, id=user_id)}
 
-        try:
-            await member.edit(deafen=True)
-            return {"success": True, "action": "deafen", "details": t("exec.vc.deafened", locale=self._locale, member=member.display_name)}
-        except (discord.Forbidden, discord.HTTPException) as e:
-            return {"success": False, "action": "deafen", "details": str(e)}
+        await member.edit(deafen=True)
+        return {"success": True, "action": "deafen", "details": t("exec.vc.deafened", locale=self._locale, member=member.display_name)}
 
     async def _undeafen(self, params: dict, guild: discord.Guild) -> dict:
         """メンバーのサーバー聴覚禁止を解除する。"""
@@ -152,11 +134,8 @@ class VoiceChannelExecutionAgent(MultiActionExecutionAgent):
         if not member:
             return {"success": False, "action": "undeafen", "details": t("not_found.member", locale=self._locale, id=user_id)}
 
-        try:
-            await member.edit(deafen=False)
-            return {"success": True, "action": "undeafen", "details": t("exec.vc.undeafened", locale=self._locale, member=member.display_name)}
-        except (discord.Forbidden, discord.HTTPException) as e:
-            return {"success": False, "action": "undeafen", "details": str(e)}
+        await member.edit(deafen=False)
+        return {"success": True, "action": "undeafen", "details": t("exec.vc.undeafened", locale=self._locale, member=member.display_name)}
 
     async def _disconnect(self, params: dict, guild: discord.Guild) -> dict:
         """メンバーをボイスチャンネルから切断する。"""
@@ -168,11 +147,8 @@ class VoiceChannelExecutionAgent(MultiActionExecutionAgent):
         if not member:
             return {"success": False, "action": "disconnect", "details": t("not_found.member", locale=self._locale, id=user_id)}
 
-        try:
-            await member.move_to(None)
-            return {"success": True, "action": "disconnect", "details": t("exec.vc.disconnected", locale=self._locale, member=member.display_name)}
-        except (discord.Forbidden, discord.HTTPException) as e:
-            return {"success": False, "action": "disconnect", "details": str(e)}
+        await member.move_to(None)
+        return {"success": True, "action": "disconnect", "details": t("exec.vc.disconnected", locale=self._locale, member=member.display_name)}
 
     async def _edit_channel(self, params: dict, guild: discord.Guild) -> dict:
         """ボイスチャンネルの設定を編集する。"""
@@ -195,8 +171,5 @@ class VoiceChannelExecutionAgent(MultiActionExecutionAgent):
         if not kwargs:
             return {"success": False, "action": "edit_channel", "details": t("exec.no_editable_params", locale=self._locale)}
 
-        try:
-            await channel.edit(**kwargs)
-            return {"success": True, "action": "edit_channel", "details": t("exec.vc.edited", locale=self._locale, name=channel.name)}
-        except (discord.Forbidden, discord.HTTPException) as e:
-            return {"success": False, "action": "edit_channel", "details": str(e)}
+        await channel.edit(**kwargs)
+        return {"success": True, "action": "edit_channel", "details": t("exec.vc.edited", locale=self._locale, name=channel.name)}

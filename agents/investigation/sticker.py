@@ -22,7 +22,7 @@ class StickerInvestigationAgent(InvestigationAgent):
             スタンプ情報のリスト。
         """
         if not guild.stickers:
-            return {"stickers": []}
+            return {"stickers": [], "total_count": 0}
 
         serialized = []
         for sticker in guild.stickers:
@@ -37,4 +37,4 @@ class StickerInvestigationAgent(InvestigationAgent):
                 "pack_name": sticker.pack_id,
             })
 
-        return {"stickers": serialized}
+        return {"stickers": serialized, "total_count": len(serialized)}

@@ -3,7 +3,6 @@ import datetime
 import discord
 
 from agents.base import SingleActionExecutionAgent
-from graph.state import AgentState
 from i18n import t
 
 NAME = "automod_execution"

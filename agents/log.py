@@ -84,13 +84,6 @@ async def log_ai_exchange(
     await append_ai_jsonl(record, state)
 
 
-def _safe_dict(d: Any) -> dict[str, Any]:
-    """JSONシリアライズ可能な辞書に変換する。"""
-    if not isinstance(d, dict):
-        return str(d)
-    return {k: _safe_dict(v) if isinstance(v, (dict, list)) else v for k, v in d.items()}
-
-
 async def log_agent_call(
     agent_name: str,
     phase: str,

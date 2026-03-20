@@ -51,6 +51,6 @@ class InviteExecutionAgent(SingleActionExecutionAgent):
         return {"success": True, "action": "create", "details": t("exec.invite.created", locale=self._locale, url=invite.url)}
 
     async def _do_delete(self, guild: discord.Guild, params: dict) -> dict:
-        invite = await guild.fetch_invite(params["invite_code"])
+        invite = await self._bot.fetch_invite(params["invite_code"])
         await invite.delete(reason=params.get("reason"))
         return {"success": True, "action": "delete", "details": t("exec.invite.deleted", locale=self._locale, code=params['invite_code'])}

@@ -54,4 +54,4 @@ class AuditLogInvestigationAgent(InvestigationAgent):
                 "changes": changes if changes else None,
             })
 
-        return {"audit_log_entries": entries}
+        return {"audit_log_entries": entries, "total_count": len(entries)}

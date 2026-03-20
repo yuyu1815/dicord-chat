@@ -1,3 +1,4 @@
+import aiohttp
 import discord
 
 from agents.base import SingleActionExecutionAgent
@@ -29,7 +30,10 @@ class EmojiExecutionAgent(SingleActionExecutionAgent):
     async def _do_create(self, guild: discord.Guild, params: dict) -> dict:
         image = params.get("image")
         if isinstance(image, str):
-            image = await discord.Preview.from_url(image).read()
+            async with aiohttp.ClientSession() as session:
+                async with session.get(image) as resp:
+                    resp.raise_for_status()
+                    image = await resp.read()
 
         kwargs: dict = {"name": params["name"], "image": image}
         if "roles" in params:

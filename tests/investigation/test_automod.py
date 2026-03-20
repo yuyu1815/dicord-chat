@@ -134,6 +134,7 @@ async def test_automod_empty_list(mock_guild, empty_state):
     
     # Assert
     assert result["auto_moderation_rules"] == []
+    assert result["total_count"] == 0
 
 
 @pytest.mark.asyncio

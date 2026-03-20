@@ -9,7 +9,7 @@ from graph.state import AgentState
 
 @pytest.fixture
 def approved_state():
-    return {"approved": True, "todos": [], "user_permissions": {}}
+    return {"approved": True, "todos": [], "user_permissions": {}, "bot": None}
 
 
 @pytest.mark.asyncio
@@ -54,7 +54,9 @@ async def test_edit_webhook(mock_guild, approved_state):
     approved_state["todos"] = [{"agent": "webhook_execution", "action": "edit", "params": {"webhook_id": 10001, "name": "Updated"}}]
     webhook = MagicMock()
     webhook.edit = AsyncMock()
-    mock_guild.fetch_webhook = AsyncMock(return_value=webhook)
+    mock_bot = MagicMock()
+    mock_bot.fetch_webhook = AsyncMock(return_value=webhook)
+    approved_state["bot"] = mock_bot
     
     # Act
     result = await agent.execute(approved_state, mock_guild)
@@ -71,7 +73,9 @@ async def test_delete_webhook(mock_guild, approved_state):
     approved_state["todos"] = [{"agent": "webhook_execution", "action": "delete", "params": {"webhook_id": 10001}}]
     webhook = MagicMock()
     webhook.delete = AsyncMock()
-    mock_guild.fetch_webhook = AsyncMock(return_value=webhook)
+    mock_bot = MagicMock()
+    mock_bot.fetch_webhook = AsyncMock(return_value=webhook)
+    approved_state["bot"] = mock_bot
     
     # Act
     result = await agent.execute(approved_state, mock_guild)
@@ -88,11 +92,13 @@ async def test_execute_webhook(mock_guild, approved_state):
     approved_state["todos"] = [{"agent": "webhook_execution", "action": "execute", "params": {"webhook_id": 10001, "content": "Hello!"}}]
     webhook = MagicMock()
     webhook.send = AsyncMock()
-    mock_guild.fetch_webhook = AsyncMock(return_value=webhook)
-    
+    mock_bot = MagicMock()
+    mock_bot.fetch_webhook = AsyncMock(return_value=webhook)
+    approved_state["bot"] = mock_bot
+
     # Act
     result = await agent.execute(approved_state, mock_guild)
-    
+
     # Assert
     assert result["success"] is True
     assert "Executed webhook" in result["details"]

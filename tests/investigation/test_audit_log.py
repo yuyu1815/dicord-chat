@@ -43,6 +43,7 @@ async def test_audit_log_list(mock_guild, empty_state):
     
     # Assert
     assert len(result["audit_log_entries"]) == 1
+    assert result["total_count"] == 1
     assert result["audit_log_entries"][0]["action_type"] == "AuditLogAction.ban"
     assert result["audit_log_entries"][0]["user"] == "AdminUser"
     assert result["audit_log_entries"][0]["target"] == "TestUser"
@@ -115,6 +116,7 @@ async def test_audit_log_custom_limit(mock_guild, empty_state):
     
     # Assert
     assert len(result["audit_log_entries"]) == 5
+    assert result["total_count"] == 5
 
 
 @pytest.mark.asyncio

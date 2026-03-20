@@ -172,6 +172,7 @@ class SingleActionExecutionAgent(ExecutionAgent):
 
     async def execute(self, state: AgentState, guild: Any) -> dict[str, Any]:
         self._locale = state.get("locale", "en")
+        self._bot = state.get("bot")
         action_name = _find_action(state, self.name)
         if not action_name:
             return {"success": False, "action": "none", "details": t("err.no_matching_todo", locale=self._locale)}
@@ -240,7 +241,17 @@ class MultiActionExecutionAgent(ExecutionAgent):
             action = todo.get("action", "")
             params = todo.get("params", {})
             await log_agent_call(self.name, "execution.action.start", state, guild=guild, action=action)
-            result = await self._dispatch(action, params, guild)
+            try:
+                result = await self._dispatch(action, params, guild)
+            except discord.Forbidden:
+                result = {"success": False, "action": action, "details": t("err.missing_permissions", locale=self._locale)}
+            except discord.NotFound:
+                result = {"success": False, "action": action, "details": t("err.not_found", locale=self._locale)}
+            except HTTPException as e:
+                result = {"success": False, "action": action, "details": t("err.api_error", locale=self._locale, text=e.text)}
+            except Exception as e:
+                logger.warning("Unexpected error in %s/%s: %s", self.name, action, e)
+                result = {"success": False, "action": action, "details": t("err.unexpected", locale=self._locale, error=e)}
             await log_agent_call(self.name, "execution.action.end", state, guild=guild, action=action, result=result)
             results.append(result)
 

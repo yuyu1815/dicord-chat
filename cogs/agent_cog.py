@@ -161,8 +161,8 @@ class ApprovalView(discord.ui.View):
 
         # Verify persisted approval record matches the current proposed_todos.
         if not await self._verify_approval():
-            channel = guild.get_channel(self.state["channel_id"])
-            if channel and isinstance(channel, discord.TextChannel):
+            channel = guild.get_channel(self.state["channel_id"]) or guild.get_thread(self.state["channel_id"])
+            if channel and isinstance(channel, (discord.TextChannel, discord.Thread)):
                 locale = self.state.get("locale", "en")
                 await channel.send(
                     t("ui.approval_verification_failed", locale=locale),
@@ -176,8 +176,8 @@ class ApprovalView(discord.ui.View):
         app = post_workflow.compile()
         final_state = await app.ainvoke(self.state)
 
-        channel = guild.get_channel(self.state["channel_id"])
-        if not channel or not isinstance(channel, discord.TextChannel):
+        channel = guild.get_channel(self.state["channel_id"]) or guild.get_thread(self.state["channel_id"])
+        if not channel or not isinstance(channel, (discord.TextChannel, discord.Thread)):
             return
 
         formatted = format_final_response(final_state)
@@ -207,8 +207,8 @@ class ApprovalView(discord.ui.View):
         app = post_workflow.compile()
         final_state = await app.ainvoke(self.state)
 
-        channel = guild.get_channel(self.state["channel_id"])
-        if not channel or not isinstance(channel, discord.TextChannel):
+        channel = guild.get_channel(self.state["channel_id"]) or guild.get_thread(self.state["channel_id"])
+        if not channel or not isinstance(channel, (discord.TextChannel, discord.Thread)):
             return
 
         locale = self.state.get("locale", "en")

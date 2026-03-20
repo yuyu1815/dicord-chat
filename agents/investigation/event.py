@@ -22,7 +22,7 @@ class EventInvestigationAgent(InvestigationAgent):
             イベント情報のリスト。
         """
         if not guild.scheduled_events:
-            return {"events": []}
+            return {"events": [], "total_count": 0}
 
         events = []
         for event in guild.scheduled_events:
@@ -43,4 +43,4 @@ class EventInvestigationAgent(InvestigationAgent):
                 "image_url": event.cover.url if event.cover else None,
             })
 
-        return {"events": events}
+        return {"events": events, "total_count": len(events)}

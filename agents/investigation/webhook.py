@@ -22,7 +22,7 @@ class WebhookInvestigationAgent(InvestigationAgent):
             Webhook情報のリスト。
         """
         if not guild.text_channels:
-            return {"webhooks": []}
+            return {"webhooks": [], "total_count": 0}
 
         all_webhooks = []
         for channel in guild.text_channels:
@@ -37,4 +37,4 @@ class WebhookInvestigationAgent(InvestigationAgent):
                     "guild_id": wh.guild_id,
                 })
 
-        return {"webhooks": all_webhooks}
+        return {"webhooks": all_webhooks, "total_count": len(all_webhooks)}

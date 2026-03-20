@@ -22,11 +22,11 @@ class StageInvestigationAgent(InvestigationAgent):
             ステージ情報のリスト。
         """
         if not guild.stage_channels:
-            return {"stages": []}
+            return {"stages": [], "total_count": 0}
 
         stages = []
         for channel in guild.stage_channels:
-            stage_instance = channel.stage_instance
+            stage_instance = channel.instance
             members = []
             if channel.members:
                 members = [m.display_name for m in channel.members]
@@ -47,4 +47,4 @@ class StageInvestigationAgent(InvestigationAgent):
 
             stages.append(stage_info)
 
-        return {"stages": stages}
+        return {"stages": stages, "total_count": len(stages)}

@@ -49,6 +49,7 @@ async def test_webhook_empty_list(mock_guild, empty_state):
     
     # Assert
     assert result["webhooks"] == []
+    assert result["total_count"] == 0
 
 
 @pytest.mark.asyncio
@@ -62,6 +63,7 @@ async def test_webhook_no_channels(mock_guild, empty_state):
     
     # Assert
     assert result["webhooks"] == []
+    assert result["total_count"] == 0
 
 
 @pytest.mark.asyncio

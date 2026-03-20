@@ -476,7 +476,7 @@ async def test_plan_next_step_json_wrapped_in_plain_prose(planner, mock_llm, bas
     assert result["summary"] == "Plain prose handled"
 
 
-# --- MainAgent.parse_request / build_todos backward compatibility ---
+# --- MainAgent.parse_request backward compatibility ---
 
 
 @pytest.mark.asyncio
@@ -493,24 +493,6 @@ async def test_parse_request_still_works(planner, mock_llm):
     # Assert
     assert result["investigation_targets"] == ["channel"]
     assert result["execution_candidates"] == []
-
-
-def test_build_todos_still_works(planner):
-    # Arrange
-    parsed = {
-        "investigation_targets": ["channel", "role"],
-        "execution_candidates": [
-            {"agent": "channel_execution", "action": "create", "params": {"name": "test"}},
-        ],
-    }
-
-    # Act
-    todos = planner.build_todos(parsed)
-
-    # Assert
-    assert len(todos) == 3
-    assert todos[0] == {"agent": "channel_investigation", "action": "investigate", "params": {}}
-    assert todos[2]["agent"] == "channel_execution"
 
 
 @pytest.mark.asyncio

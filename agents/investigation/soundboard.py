@@ -23,7 +23,7 @@ class SoundboardInvestigationAgent(InvestigationAgent):
         """
         sounds = guild.soundboard_sounds
         if not sounds:
-            return {"soundboard_sounds": []}
+            return {"soundboard_sounds": [], "total_count": 0}
 
         serialized = []
         for sound in sounds:
@@ -41,4 +41,4 @@ class SoundboardInvestigationAgent(InvestigationAgent):
                 "guild_id": sound.guild_id,
             })
 
-        return {"soundboard_sounds": serialized}
+        return {"soundboard_sounds": serialized, "total_count": len(serialized)}

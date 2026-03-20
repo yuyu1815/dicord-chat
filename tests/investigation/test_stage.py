@@ -19,13 +19,13 @@ async def test_stage_channel_list(mock_guild, empty_state):
     stage.category = None
     stage.bitrate = 64000
     stage.members = []
-    stage.stage_instance = None
-    
+    stage.instance = None
+
     mock_guild.stage_channels = [stage]
-    
+
     # Act
     result = await agent.investigate(empty_state, mock_guild)
-    
+
     # Assert
     assert result["stages"][0]["name"] == "Community Talk"
     assert result["stages"][0]["topic"] == "Weekly discussion"
@@ -53,7 +53,7 @@ async def test_stage_with_active_instance(mock_guild, empty_state):
     stage.category = None
     stage.bitrate = 128000
     stage.members = [member1, member2]
-    stage.stage_instance = stage_instance
+    stage.instance = stage_instance
     
     mock_guild.stage_channels = [stage]
     
@@ -77,6 +77,7 @@ async def test_stage_empty_list(mock_guild, empty_state):
     
     # Assert
     assert result["stages"] == []
+    assert result["total_count"] == 0
 
 
 @pytest.mark.asyncio
@@ -94,13 +95,13 @@ async def test_stage_with_category(mock_guild, empty_state):
     stage.category = category
     stage.bitrate = 64000
     stage.members = []
-    stage.stage_instance = None
-    
+    stage.instance = None
+
     mock_guild.stage_channels = [stage]
-    
+
     # Act
     result = await agent.investigate(empty_state, mock_guild)
-    
+
     # Assert
     assert result["stages"][0]["category"] == "Events"
 

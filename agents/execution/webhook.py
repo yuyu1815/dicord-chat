@@ -41,7 +41,7 @@ class WebhookExecutionAgent(SingleActionExecutionAgent):
         return {"success": True, "action": "create", "details": t("exec.webhook.created", locale=self._locale, name=webhook.name, channel=channel.name)}
 
     async def _do_edit(self, guild: discord.Guild, params: dict) -> dict:
-        webhook = await guild.fetch_webhook(params["webhook_id"])
+        webhook = await self._bot.fetch_webhook(params["webhook_id"])
         kwargs: dict = {}
         if "name" in params:
             kwargs["name"] = params["name"]
@@ -56,12 +56,12 @@ class WebhookExecutionAgent(SingleActionExecutionAgent):
         return {"success": True, "action": "edit", "details": t("exec.webhook.edited", locale=self._locale, id=params['webhook_id'])}
 
     async def _do_delete(self, guild: discord.Guild, params: dict) -> dict:
-        webhook = await guild.fetch_webhook(params["webhook_id"])
+        webhook = await self._bot.fetch_webhook(params["webhook_id"])
         await webhook.delete(reason=params.get("reason"))
         return {"success": True, "action": "delete", "details": t("exec.webhook.deleted", locale=self._locale, id=params['webhook_id'])}
 
     async def _do_execute(self, guild: discord.Guild, params: dict) -> dict:
-        webhook = await guild.fetch_webhook(params["webhook_id"])
+        webhook = await self._bot.fetch_webhook(params["webhook_id"])
         kwargs: dict = {
             "content": params.get("content"),
             "username": params.get("username"),

@@ -176,22 +176,6 @@ class MainAgent:
             logger.error("Failed to parse request with LLM: %s", e)
             return {"investigation_targets": [], "execution_candidates": [], "todos": []}
 
-    def build_todos(self, parsed: dict[str, Any]) -> list[Todo]:
-        """LLMの解析結果を構造化されたタスクリストに変換する。
-
-        Args:
-            parsed: :meth:`parse_request` の戻り値。
-
-        Returns:
-            各タスクのエージェント名・アクション・パラメータを含むリスト。
-        """
-        todos: list[Todo] = []
-        for target in parsed.get("investigation_targets", []):
-            todos.append({"agent": f"{target}_investigation", "action": "investigate", "params": {}})
-        for candidate in parsed.get("execution_candidates", []):
-            todos.append(candidate)
-        return todos
-
     async def plan_next_step(self, state: AgentState) -> dict[str, Any]:
         """現在の状態から次の計画ステップを決定する。
 

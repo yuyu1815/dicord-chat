@@ -24,9 +24,9 @@ class General(commands.Cog, name="general"):
         )
         for i in self.bot.cogs:
             cog = self.bot.get_cog(i.lower())
-            commands = cog.get_commands()
+            cog_commands = cog.get_commands()
             data = []
-            for command in commands:
+            for command in cog_commands:
                 description = command.description.partition("\n")[0]
                 data.append(f"{command.name} - {description}")
             help_text = "\n".join(data)

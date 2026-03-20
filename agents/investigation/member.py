@@ -24,7 +24,16 @@ class MemberInvestigationAgent(InvestigationAgent):
         Returns:
             メンバー情報の辞書。
         """
+        # Check params from the todo for a specific target
         target_user_id = state.get("user_id")
+
+        # Look for a target member in the todo params
+        todos = state.get("todos", [])
+        for todo in todos:
+            if todo.get("agent") == "member_investigation":
+                params = todo.get("params", {})
+                target_user_id = params.get("target_id") or params.get("user_id") or target_user_id
+                break
 
         if target_user_id is not None:
             return await self._single_member(guild, target_user_id, state)

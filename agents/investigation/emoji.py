@@ -22,7 +22,7 @@ class EmojiInvestigationAgent(InvestigationAgent):
             絵文字情報のリスト。
         """
         if not guild.emojis:
-            return {"emojis": []}
+            return {"emojis": [], "total_count": 0}
 
         serialized = []
         for emoji in guild.emojis:
@@ -39,4 +39,4 @@ class EmojiInvestigationAgent(InvestigationAgent):
                 "creator": creator_name,
             })
 
-        return {"emojis": serialized}
+        return {"emojis": serialized, "total_count": len(serialized)}
