@@ -271,7 +271,7 @@ class ThreadExecutionAgent(MultiActionExecutionAgent):
             return {"success": False, "action": "remove_member", "details": t("not_found.member", locale=self._locale, id=member_id)}
 
         try:
-            await thread.remove_member(member)
+            await thread.remove_user(member)
             return {"success": True, "action": "remove_member", "details": t("exec.thread.member_removed", locale=self._locale, member=member.display_name, name=thread.name)}
         except (discord.Forbidden, discord.HTTPException) as e:
             return {"success": False, "action": "remove_member", "details": str(e)}

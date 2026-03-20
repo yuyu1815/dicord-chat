@@ -71,14 +71,58 @@ async def test_kick_member(mock_guild, approved_state, mock_member):
     mock_member.id = 2001
     mock_member.display_name = "KickedUser"
     mock_member.kick = AsyncMock()
+    mock_member.send = AsyncMock()
     mock_guild.get_member = MagicMock(return_value=mock_member)
-    
+
     # Act
     result = await agent.execute(approved_state, mock_guild)
-    
+
     # Assert
     assert result["success"] is True
     assert "Kicked" in result["details"]
+    mock_member.send.assert_awaited_once()
+    sent_embed = mock_member.send.call_args.kwargs["embed"]
+    assert isinstance(sent_embed, discord.Embed)
+    assert "Spam" in sent_embed.fields[1].value
+    # Arrange
+    agent = MemberExecutionAgent()
+    approved_state["todos"] = [{"agent": "member_execution", "action": "kick", "params": {"member_id": 2001, "reason": "Spam", "message": "Please follow the rules."}}]
+    mock_member.id = 2001
+    mock_member.display_name = "KickedUser"
+    mock_member.kick = AsyncMock()
+    mock_member.send = AsyncMock()
+    mock_guild.name = "Test Server"
+    mock_guild.get_member = MagicMock(return_value=mock_member)
+
+    # Act
+    result = await agent.execute(approved_state, mock_guild)
+
+    # Assert
+    assert result["success"] is True
+    assert "notification" in result["details"].lower()
+    sent_embed = mock_member.send.call_args.kwargs["embed"]
+    assert any(f.value == "Spam" for f in sent_embed.fields)
+    assert any(f.value == "Please follow the rules." for f in sent_embed.fields)
+
+
+@pytest.mark.asyncio
+async def test_kick_member_dm_blocked(mock_guild, approved_state, mock_member):
+    # Arrange
+    agent = MemberExecutionAgent()
+    approved_state["todos"] = [{"agent": "member_execution", "action": "kick", "params": {"member_id": 2001, "reason": "Spam"}}]
+    mock_member.id = 2001
+    mock_member.display_name = "KickedUser"
+    mock_member.kick = AsyncMock()
+    mock_member.send = AsyncMock(side_effect=discord.Forbidden(MagicMock(), "DM blocked"))
+    mock_guild.get_member = MagicMock(return_value=mock_member)
+
+    # Act
+    result = await agent.execute(approved_state, mock_guild)
+
+    # Assert
+    assert result["success"] is True
+    assert "Kicked" in result["details"]
+    assert "notification" not in result["details"].lower()
 
 
 @pytest.mark.asyncio
@@ -89,14 +133,60 @@ async def test_ban_member(mock_guild, approved_state, mock_member):
     mock_member.id = 2001
     mock_member.display_name = "BannedUser"
     mock_member.ban = AsyncMock()
+    mock_member.send = AsyncMock()
     mock_guild.get_member = MagicMock(return_value=mock_member)
-    
+
     # Act
     result = await agent.execute(approved_state, mock_guild)
-    
+
     # Assert
     assert result["success"] is True
     assert "Banned" in result["details"]
+    mock_member.send.assert_awaited_once()
+    sent_embed = mock_member.send.call_args.kwargs["embed"]
+    assert isinstance(sent_embed, discord.Embed)
+    assert "Toxic" in sent_embed.fields[1].value
+
+
+@pytest.mark.asyncio
+async def test_ban_member_with_message(mock_guild, approved_state, mock_member):
+    # Arrange
+    agent = MemberExecutionAgent()
+    approved_state["todos"] = [{"agent": "member_execution", "action": "ban", "params": {"member_id": 2001, "reason": "Toxic", "message": "Appeal in #support if you disagree."}}]
+    mock_member.id = 2001
+    mock_member.display_name = "BannedUser"
+    mock_member.ban = AsyncMock()
+    mock_member.send = AsyncMock()
+    mock_guild.name = "Test Server"
+    mock_guild.get_member = MagicMock(return_value=mock_member)
+
+    # Act
+    result = await agent.execute(approved_state, mock_guild)
+
+    # Assert
+    assert result["success"] is True
+    assert "notification" in result["details"].lower()
+    sent_embed = mock_member.send.call_args.kwargs["embed"]
+    assert any(f.value == "Appeal in #support if you disagree." for f in sent_embed.fields)
+
+
+@pytest.mark.asyncio
+async def test_ban_member_no_reason_no_message(mock_guild, approved_state, mock_member):
+    # Arrange — reasonもmessageもない場合はDM送信しない
+    agent = MemberExecutionAgent()
+    approved_state["todos"] = [{"agent": "member_execution", "action": "ban", "params": {"member_id": 2001}}]
+    mock_member.id = 2001
+    mock_member.display_name = "BannedUser"
+    mock_member.ban = AsyncMock()
+    mock_member.send = AsyncMock()
+    mock_guild.get_member = MagicMock(return_value=mock_member)
+
+    # Act
+    result = await agent.execute(approved_state, mock_guild)
+
+    # Assert
+    assert result["success"] is True
+    mock_member.send.assert_not_awaited()
 
 
 @pytest.mark.asyncio

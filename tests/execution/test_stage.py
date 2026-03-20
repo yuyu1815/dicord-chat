@@ -73,19 +73,20 @@ async def test_delete_stage_instance(mock_guild, approved_state):
     agent = StageExecutionAgent()
     approved_state["todos"] = [{"agent": "stage_execution", "action": "delete_stage_instance", "params": {"channel_id": 6001}}]
     stage_instance = MagicMock()
-    stage_instance.end = AsyncMock()
+    stage_instance.delete = AsyncMock()
     stage_channel = MagicMock(spec=discord.StageChannel)
     stage_channel.id = 6001
     stage_channel.name = "Main Stage"
     stage_channel.instance = stage_instance
     mock_guild.get_channel = MagicMock(return_value=stage_channel)
-    
+
     # Act
     result = await agent.execute(approved_state, mock_guild)
-    
+
     # Assert
     assert result["success"] is True
     assert "Ended stage instance" in result["details"]
+    stage_instance.delete.assert_awaited_once()
 
 
 @pytest.mark.asyncio

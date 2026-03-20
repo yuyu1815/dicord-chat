@@ -331,7 +331,6 @@ async def test_edit_afk_channel_not_found(mock_guild, approved_state):
 @pytest.mark.parametrize("level_name,expected", [
     ("disabled", discord.ContentFilter.disabled),
     ("no_role", discord.ContentFilter.no_role),
-    ("members_without_roles", discord.ContentFilter.try_value),
     ("all_members", discord.ContentFilter.all_members),
 ])
 async def test_edit_content_filter(mock_guild, approved_state, level_name, expected):

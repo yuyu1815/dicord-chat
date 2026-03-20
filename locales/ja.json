@@ -112,6 +112,7 @@
   "exec.member.kicked": "{name} をキックしました",
   "exec.member.banned": "{name} をBANしました",
   "exec.member.unbanned": "ユーザー {user_id} のBANを解除しました",
+  "exec.member.notified": "（通知を送信しました）",
 
   "exec.message.sent": "#{channel} にメッセージを送信しました ({id})",
   "exec.message.replied": "#{channel} のメッセージ {reply_id} に返信しました ({id})",
@@ -207,6 +208,7 @@
   "exec.automod.rule_created": "AutoModルール '{name}' を作成しました。",
   "exec.automod.rule_edited": "AutoModルール '{name}' を編集しました。",
   "exec.automod.rule_deleted": "AutoModルール {id} を削除しました。",
+  "exec.automod.rule_not_found": "AutoModルールが見つかりません。",
 
   "exec.poll.created": "#{channel} に投票を作成しました ({id})",
   "exec.poll.ended": "#{channel} の投票 {id} を終了しました",

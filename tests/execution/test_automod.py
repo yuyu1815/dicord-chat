@@ -52,14 +52,16 @@ async def test_edit_rule(mock_guild, approved_state):
     approved_state["todos"] = [{"agent": "automod_execution", "action": "edit_rule", "params": {"rule_id": 1001, "name": "Updated Rule", "enabled": True}}]
     rule = MagicMock()
     rule.name = "Updated Rule"
-    mock_guild.edit_automod_rule = AsyncMock(return_value=rule)
-    
+    rule.edit = AsyncMock()
+    mock_guild.fetch_automod_rule = AsyncMock(return_value=rule)
+
     # Act
     result = await agent.execute(approved_state, mock_guild)
-    
+
     # Assert
     assert result["success"] is True
     assert "Edited AutoMod rule" in result["details"]
+    rule.edit.assert_awaited_once()
 
 
 @pytest.mark.asyncio
@@ -67,14 +69,17 @@ async def test_delete_rule(mock_guild, approved_state):
     # Arrange
     agent = AutoModExecutionAgent()
     approved_state["todos"] = [{"agent": "automod_execution", "action": "delete_rule", "params": {"rule_id": 1001}}]
-    mock_guild.delete_automod_rule = AsyncMock()
-    
+    rule = MagicMock()
+    rule.delete = AsyncMock()
+    mock_guild.fetch_automod_rule = AsyncMock(return_value=rule)
+
     # Act
     result = await agent.execute(approved_state, mock_guild)
-    
+
     # Assert
     assert result["success"] is True
     assert "1001" in result["details"]
+    rule.delete.assert_awaited_once()
 
 
 @pytest.mark.asyncio
@@ -97,11 +102,11 @@ async def test_not_found_error(mock_guild, approved_state):
     # Arrange
     agent = AutoModExecutionAgent()
     approved_state["todos"] = [{"agent": "automod_execution", "action": "edit_rule", "params": {"rule_id": 99999}}]
-    mock_guild.edit_automod_rule = AsyncMock(side_effect=discord.NotFound(MagicMock(), "Not found"))
-    
+    mock_guild.fetch_automod_rule = AsyncMock(side_effect=discord.NotFound(MagicMock(), "Not found"))
+
     # Act
     result = await agent.execute(approved_state, mock_guild)
-    
+
     # Assert
     assert result["success"] is False
     assert "not found" in result["details"].lower()

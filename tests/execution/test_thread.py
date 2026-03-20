@@ -346,7 +346,7 @@ async def test_remove_member_from_thread(mock_guild, approved_state, mock_member
     thread = MagicMock()
     thread.id = 8001
     thread.name = "TestThread"
-    thread.remove_member = AsyncMock()
+    thread.remove_user = AsyncMock()
     mock_member.id = 2001
     mock_member.display_name = "TestUser"
     mock_guild.get_thread = MagicMock(return_value=thread)
@@ -357,7 +357,7 @@ async def test_remove_member_from_thread(mock_guild, approved_state, mock_member
 
     # Assert
     assert result["success"] is True
-    thread.remove_member.assert_called_once_with(mock_member)
+    thread.remove_user.assert_called_once_with(mock_member)
 
 
 @pytest.mark.asyncio

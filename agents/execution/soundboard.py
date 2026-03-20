@@ -1,5 +1,3 @@
-import io
-
 import discord
 
 from agents.base import SingleActionExecutionAgent
@@ -28,10 +26,12 @@ class SoundboardExecutionAgent(SingleActionExecutionAgent):
     def name(self) -> str:
         return NAME
 
-    def _resolve_sound(self, data: bytes | None) -> io.IOBase:
+    def _resolve_sound(self, data: bytes | None) -> bytes:
         if data is None:
             raise ValueError(t("exec.soundboard.data_required", locale=self._locale))
-        return io.BytesIO(data)
+        if isinstance(data, bytes):
+            return data
+        raise ValueError(t("exec.soundboard.data_required", locale=self._locale))
 
     async def _do_create(self, guild: discord.Guild, params: dict) -> dict:
         sound = self._resolve_sound(params.get("sound"))

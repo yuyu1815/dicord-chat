@@ -8,14 +8,6 @@ from i18n import t
 
 NAME = "sticker_execution"
 
-FORMAT_MAP: dict[str, int] = {
-    "png": 1,
-    "apng": 2,
-    "lottie": 3,
-    "gif": 4,
-}
-
-
 class StickerExecutionAgent(SingleActionExecutionAgent):
     ACTION_HANDLERS: dict[str, str] = {
         "create": "Create sticker",
@@ -40,23 +32,15 @@ class StickerExecutionAgent(SingleActionExecutionAgent):
             raise ValueError(t("exec.sticker.data_required", locale=self._locale))
         return io.BytesIO(data)
 
-    def _resolve_format(self, raw: str | None) -> int:
-        if raw is None:
-            return 1  # PNG default
-        return FORMAT_MAP.get(raw, 1)
-
     async def _do_create(self, guild: discord.Guild, params: dict) -> dict:
         file = self._resolve_file(params.get("file"))
-        format_type = self._resolve_format(params.get("format_type"))
 
         kwargs: dict = {
             "name": params["name"],
             "description": params.get("description", ""),
+            "emoji": params.get("tags", params.get("emoji", "\U0001f4a9")),
             "file": file,
-            "format_type": format_type,
         }
-        if "tags" in params:
-            kwargs["tags"] = params["tags"]
 
         sticker = await guild.create_sticker(**kwargs)
         return {"success": True, "action": "create", "details": t("exec.sticker.created", locale=self._locale, name=sticker.name)}
@@ -72,7 +56,9 @@ class StickerExecutionAgent(SingleActionExecutionAgent):
         if "description" in params:
             kwargs["description"] = params["description"]
         if "tags" in params:
-            kwargs["tags"] = params["tags"]
+            kwargs["emoji"] = params["tags"]
+        elif "emoji" in params:
+            kwargs["emoji"] = params["emoji"]
 
         await sticker.edit(**kwargs)
         return {"success": True, "action": "edit", "details": t("exec.sticker.edited", locale=self._locale, name=sticker.name)}

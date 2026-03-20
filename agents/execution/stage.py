@@ -52,7 +52,7 @@ class StageExecutionAgent(SingleActionExecutionAgent):
         instance = channel.instance
         if not instance:
             return {"success": False, "action": "delete_stage_instance", "details": t("exec.stage.no_instance", locale=self._locale)}
-        await instance.end()
+        await instance.delete()
         return {"success": True, "action": "delete_stage_instance", "details": t("exec.stage.ended", locale=self._locale, channel=channel.name)}
 
     async def _do_edit_channel(self, guild: discord.Guild, params: dict) -> dict:

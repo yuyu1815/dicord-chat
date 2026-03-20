@@ -35,6 +35,14 @@ def _build_trigger_type(trigger_type: str) -> discord.AutoModRuleTriggerType:
     return type_map.get(trigger_type, discord.AutoModRuleTriggerType.keyword)
 
 
+def _build_event_type(event_type: str) -> discord.AutoModRuleEventType:
+    type_map = {
+        "message_send": discord.AutoModRuleEventType.message_send,
+        "member_update": discord.AutoModRuleEventType.member_update,
+    }
+    return type_map.get(event_type, discord.AutoModRuleEventType.message_send)
+
+
 def _build_actions(actions: list[dict] | None) -> list[discord.AutoModRuleAction]:
     if not actions:
         return []
@@ -78,8 +86,11 @@ class AutoModExecutionAgent(SingleActionExecutionAgent):
         trigger = _build_trigger(params.get("trigger_type", "keyword"), params.get("trigger_metadata"))
         actions = _build_actions(params.get("actions"))
 
+        event_type = _build_event_type(params.get("event_type", "message_send"))
+
         kwargs: dict = {
             "name": params["name"],
+            "event_type": event_type,
             "trigger": trigger,
             "actions": actions,
             "enabled": params.get("enabled", True),
@@ -93,19 +104,37 @@ class AutoModExecutionAgent(SingleActionExecutionAgent):
         return {"success": True, "action": "create_rule", "details": t("exec.automod.rule_created", locale=self._locale, name=rule.name)}
 
     async def _do_edit_rule(self, guild: discord.Guild, params: dict) -> dict:
+        rule_id = params.get("rule_id")
+        if not rule_id:
+            return {"success": False, "action": "edit_rule", "details": t("exec.missing_param", locale=self._locale, param="rule_id")}
+
+        try:
+            rule = await guild.fetch_automod_rule(rule_id)
+        except discord.NotFound:
+            return {"success": False, "action": "edit_rule", "details": t("exec.automod.rule_not_found", locale=self._locale)}
+
         kwargs: dict = {}
         if "name" in params:
             kwargs["name"] = params["name"]
         if "trigger_type" in params:
-            kwargs["trigger_type"] = _build_trigger_type(params["trigger_type"])
+            kwargs["trigger"] = _build_trigger(params["trigger_type"], params.get("trigger_metadata"))
         if "actions" in params:
             kwargs["actions"] = _build_actions(params["actions"])
         if "enabled" in params:
             kwargs["enabled"] = params["enabled"]
+        if "event_type" in params:
+            kwargs["event_type"] = _build_event_type(params["event_type"])
 
-        rule = await guild.edit_automod_rule(params["rule_id"], **kwargs)
+        await rule.edit(**kwargs)
         return {"success": True, "action": "edit_rule", "details": t("exec.automod.rule_edited", locale=self._locale, name=rule.name)}
 
     async def _do_delete_rule(self, guild: discord.Guild, params: dict) -> dict:
-        await guild.delete_automod_rule(params["rule_id"])
-        return {"success": True, "action": "delete_rule", "details": t("exec.automod.rule_deleted", locale=self._locale, id=params['rule_id'])}
+        rule_id = params.get("rule_id")
+        if not rule_id:
+            return {"success": False, "action": "delete_rule", "details": t("exec.missing_param", locale=self._locale, param="rule_id")}
+        try:
+            rule = await guild.fetch_automod_rule(rule_id)
+        except discord.NotFound:
+            return {"success": False, "action": "delete_rule", "details": t("exec.automod.rule_not_found", locale=self._locale)}
+        await rule.delete()
+        return {"success": True, "action": "delete_rule", "details": t("exec.automod.rule_deleted", locale=self._locale, id=rule_id)}

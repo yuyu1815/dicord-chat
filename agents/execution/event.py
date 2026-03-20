@@ -28,6 +28,15 @@ class EventExecutionAgent(SingleActionExecutionAgent):
     def name(self) -> str:
         return NAME
 
+    def _parse_event_status(self, raw: str | None) -> discord.EventStatus:
+        status_map = {
+            "scheduled": discord.EventStatus.scheduled,
+            "active": discord.EventStatus.active,
+            "completed": discord.EventStatus.completed,
+            "canceled": discord.EventStatus.canceled,
+        }
+        return status_map.get(raw, discord.EventStatus.scheduled)
+
     def _parse_event_type(self, raw: str | None) -> discord.EntityType:
         type_map = {
             "stage_instance": discord.EntityType.stage_instance,
@@ -43,6 +52,7 @@ class EventExecutionAgent(SingleActionExecutionAgent):
             "name": params["name"],
             "start_time": datetime.datetime.fromisoformat(params["start_time"]),
             "entity_type": entity_type,
+            "privacy_level": discord.PrivacyLevel.guild_only,
         }
         if "description" in params:
             kwargs["description"] = params["description"]
@@ -62,9 +72,12 @@ class EventExecutionAgent(SingleActionExecutionAgent):
             return {"success": False, "action": "edit", "details": t("exec.event.not_found", locale=self._locale)}
 
         kwargs: dict = {}
-        for key in ("name", "description", "status"):
-            if key in params:
-                kwargs[key] = params[key]
+        if "name" in params:
+            kwargs["name"] = params["name"]
+        if "description" in params:
+            kwargs["description"] = params["description"]
+        if "status" in params:
+            kwargs["status"] = self._parse_event_status(params["status"])
         if "start_time" in params:
             kwargs["start_time"] = datetime.datetime.fromisoformat(params["start_time"])
         if "end_time" in params:

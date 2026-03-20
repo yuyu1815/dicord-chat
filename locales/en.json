@@ -112,6 +112,7 @@
   "exec.member.kicked": "Kicked {name}",
   "exec.member.banned": "Banned {name}",
   "exec.member.unbanned": "Unbanned user {user_id}",
+  "exec.member.notified": "(notification sent)",
 
   "exec.message.sent": "Sent message in #{channel} ({id})",
   "exec.message.replied": "Replied to message {reply_id} in #{channel} ({id})",
@@ -207,6 +208,7 @@
   "exec.automod.rule_created": "Created AutoMod rule '{name}'.",
   "exec.automod.rule_edited": "Edited AutoMod rule '{name}'.",
   "exec.automod.rule_deleted": "Deleted AutoMod rule {id}.",
+  "exec.automod.rule_not_found": "AutoMod rule not found.",
 
   "exec.poll.created": "Created poll in #{channel} ({id})",
   "exec.poll.ended": "Ended poll {id} in #{channel}",

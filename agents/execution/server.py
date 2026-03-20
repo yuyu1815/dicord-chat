@@ -178,7 +178,6 @@ class ServerExecutionAgent(MultiActionExecutionAgent):
         level_map = {
             "disabled": discord.ContentFilter.disabled,
             "no_role": discord.ContentFilter.no_role,
-            "members_without_roles": discord.ContentFilter.try_value,
             "all_members": discord.ContentFilter.all_members,
         }
         level = level_map.get(level_name.lower())

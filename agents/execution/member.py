@@ -36,6 +36,56 @@ class MemberExecutionAgent(MultiActionExecutionAgent):
             return {"success": False, "action": action, "details": t("err.unknown_action", locale=self._locale, action=action)}
         return await handler(params, guild)
 
+    def _build_notification_embed(
+        self, guild: discord.Guild, action: str, reason: str | None, message: str | None,
+    ) -> discord.Embed:
+        """アクション通知用Embedを構築する。"""
+        is_ja = self._locale and self._locale.startswith("ja")
+        if action == "ban":
+            color = discord.Color.red()
+            title = "BAN通知" if is_ja else "You Have Been Banned"
+        else:
+            color = discord.Color.orange()
+            title = "キック通知" if is_ja else "You Have Been Kicked"
+
+        embed = discord.Embed(
+            title=title,
+            color=color,
+            timestamp=datetime.now(timezone.utc),
+        )
+        embed.add_field(
+            name="サーバー" if is_ja else "Server",
+            value=guild.name,
+            inline=False,
+        )
+        if reason:
+            embed.add_field(
+                name="理由" if is_ja else "Reason",
+                value=reason,
+                inline=False,
+            )
+        if message:
+            embed.add_field(
+                name="メッセージ" if is_ja else "Message",
+                value=message,
+                inline=False,
+            )
+        return embed
+
+    async def _try_send_notification(
+        self, member: discord.Member, guild: discord.Guild, action: str,
+        reason: str | None, message: str | None,
+    ) -> bool:
+        """対象メンバーにDMで通知を送信する。DMがブロックされている場合は無視する。"""
+        if not reason and not message:
+            return False
+        embed = self._build_notification_embed(guild, action, reason, message)
+        try:
+            await member.send(embed=embed)
+            return True
+        except (discord.Forbidden, discord.HTTPException):
+            return False
+
     async def _edit_nickname(self, params: dict, guild: discord.Guild) -> dict:
         """メンバーのニックネームを変更する。"""
         member_id = params.get("member_id")
@@ -120,6 +170,7 @@ class MemberExecutionAgent(MultiActionExecutionAgent):
         """メンバーをキックする。"""
         member_id = params.get("member_id")
         reason = params.get("reason")
+        message = params.get("message")
         if not member_id:
             return {"success": False, "action": "kick", "details": t("exec.missing_param", locale=self._locale, param="member_id")}
 
@@ -128,8 +179,12 @@ class MemberExecutionAgent(MultiActionExecutionAgent):
             return {"success": False, "action": "kick", "details": t("not_found.member", locale=self._locale, id=member_id)}
 
         try:
+            notified = await self._try_send_notification(member, guild, "kick", reason, message)
             await member.kick(reason=reason)
-            return {"success": True, "action": "kick", "details": t("exec.member.kicked", locale=self._locale, name=member.display_name)}
+            details = t("exec.member.kicked", locale=self._locale, name=member.display_name)
+            if notified:
+                details += " " + t("exec.member.notified", locale=self._locale)
+            return {"success": True, "action": "kick", "details": details}
         except (discord.Forbidden, discord.HTTPException) as e:
             return {"success": False, "action": "kick", "details": str(e)}
 
@@ -137,6 +192,7 @@ class MemberExecutionAgent(MultiActionExecutionAgent):
         """メンバーをBANする。"""
         member_id = params.get("member_id")
         reason = params.get("reason")
+        message = params.get("message")
         delete_message_days = params.get("delete_message_days", 0)
         if not member_id:
             return {"success": False, "action": "ban", "details": t("exec.missing_param", locale=self._locale, param="member_id")}
@@ -146,8 +202,12 @@ class MemberExecutionAgent(MultiActionExecutionAgent):
             return {"success": False, "action": "ban", "details": t("not_found.member", locale=self._locale, id=member_id)}
 
         try:
+            notified = await self._try_send_notification(member, guild, "ban", reason, message)
             await member.ban(reason=reason, delete_message_days=delete_message_days)
-            return {"success": True, "action": "ban", "details": t("exec.member.banned", locale=self._locale, name=member.display_name)}
+            details = t("exec.member.banned", locale=self._locale, name=member.display_name)
+            if notified:
+                details += " " + t("exec.member.notified", locale=self._locale)
+            return {"success": True, "action": "ban", "details": details}
         except (discord.Forbidden, discord.HTTPException) as e:
             return {"success": False, "action": "ban", "details": str(e)}
 

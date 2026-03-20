@@ -16,24 +16,27 @@ def approved_state():
 async def test_create_sticker(mock_guild, approved_state):
     # Arrange
     agent = StickerExecutionAgent()
-    approved_state["todos"] = [{"agent": "sticker_execution", "action": "create", "params": {"name": "hello", "file": b"sticker_data", "format_type": "png"}}]
+    approved_state["todos"] = [{"agent": "sticker_execution", "action": "create", "params": {"name": "hello", "file": b"sticker_data", "tags": "hello"}}]
     sticker = MagicMock()
     sticker.name = "hello"
     mock_guild.create_sticker = AsyncMock(return_value=sticker)
-    
+
     # Act
     result = await agent.execute(approved_state, mock_guild)
-    
+
     # Assert
     assert result["success"] is True
     assert "Created sticker" in result["details"]
+    # Verify emoji param is passed from tags
+    call_kwargs = mock_guild.create_sticker.call_args.kwargs
+    assert call_kwargs["emoji"] == "hello"
 
 
 @pytest.mark.asyncio
 async def test_create_sticker_with_tags(mock_guild, approved_state):
     # Arrange
     agent = StickerExecutionAgent()
-    approved_state["todos"] = [{"agent": "sticker_execution", "action": "create", "params": {"name": "wave", "file": b"data", "format_type": "apng", "tags": "wave, hello", "description": "A wave"}}]
+    approved_state["todos"] = [{"agent": "sticker_execution", "action": "create", "params": {"name": "wave", "file": b"data", "tags": "wave, hello", "description": "A wave"}}]
     sticker = MagicMock()
     sticker.name = "wave"
     mock_guild.create_sticker = AsyncMock(return_value=sticker)
