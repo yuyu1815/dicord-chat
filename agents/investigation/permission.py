@@ -1,0 +1,74 @@
+import discord
+
+from agents.base import InvestigationAgent
+from graph.state import AgentState
+
+KEY_PERMISSIONS = [
+    "administrator",
+    "manage_guild",
+    "manage_channels",
+    "manage_messages",
+    "manage_roles",
+    "kick_members",
+    "ban_members",
+    "send_messages",
+    "read_messages",
+    "connect",
+    "speak",
+]
+
+
+class PermissionInvestigationAgent(InvestigationAgent):
+    @property
+    def name(self) -> str:
+        return "permission_investigation"
+
+    async def investigate(self, state: AgentState, guild: discord.Guild) -> dict:
+        channel_id = state.get("channel_id")
+
+        if channel_id is None:
+            return self._guild_level_permissions(guild)
+
+        channel = guild.get_channel(channel_id)
+        if channel is None:
+            return {"error": f"channel {channel_id} not found in guild"}
+
+        return await self._channel_overwrites(channel, guild)
+
+    def _guild_level_permissions(self, guild: discord.Guild) -> dict:
+        role_perms = []
+        for role in guild.roles:
+            perms = role.permissions
+            summary = {perm: getattr(perms, perm, False) for perm in KEY_PERMISSIONS}
+            role_perms.append({
+                "role_id": role.id,
+                "role_name": role.name,
+                "permissions": summary,
+            })
+        return {"scope": "guild", "roles": role_perms}
+
+    async def _channel_overwrites(
+        self, channel: discord.abc.GuildChannel, guild: discord.Guild
+    ) -> dict:
+        overwrites = []
+        for target, overwrite in channel.overwrites.items():
+            is_role = isinstance(target, discord.Role)
+            perms = overwrite.pair()
+
+            allowed = [p for p, v in perms[0] if v]
+            denied = [p for p, v in perms[1] if v]
+
+            overwrites.append({
+                "target_id": target.id,
+                "target_name": target.name if is_role else str(target),
+                "target_type": "role" if is_role else "member",
+                "allowed": allowed,
+                "denied": denied,
+            })
+
+        return {
+            "scope": "channel",
+            "channel_id": channel.id,
+            "channel_name": channel.name,
+            "overwrites": overwrites,
+        }

@@ -1,9 +1,13 @@
 [project]
 name = "discord-bot"
 version = "0.1.0"
-description = "Minimal Discord bot"
+description = "Discord management multi-agent system with LangGraph"
 requires-python = ">=3.10"
 dependencies = [
     "discord.py>=2.7.0",
     "python-dotenv",
+    "langgraph>=0.2.0",
+    "langchain>=0.3.0",
+    "langchain-openai>=0.2.0",
+    "aiosqlite>=0.20.0",
 ]

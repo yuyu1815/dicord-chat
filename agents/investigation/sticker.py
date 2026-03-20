@@ -1,0 +1,29 @@
+import discord
+
+from agents.base import InvestigationAgent
+from graph.state import AgentState
+
+
+class StickerInvestigationAgent(InvestigationAgent):
+    @property
+    def name(self) -> str:
+        return "sticker_investigation"
+
+    async def investigate(self, state: AgentState, guild: discord.Guild) -> dict:
+        if not guild.stickers:
+            return {"stickers": []}
+
+        serialized = []
+        for sticker in guild.stickers:
+            serialized.append({
+                "id": sticker.id,
+                "name": sticker.name,
+                "description": sticker.description,
+                "format_type": str(sticker.format),
+                "tags": sticker.tags,
+                "available": sticker.available,
+                "created_at": sticker.created_at.isoformat() if sticker.created_at else None,
+                "pack_name": sticker.pack_id,
+            })
+
+        return {"stickers": serialized}
