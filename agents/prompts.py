@@ -2,15 +2,19 @@
 
 EXECUTION_PARAMS_GUIDE = """
 Image/audio source parameters (for emoji, sticker, soundboard, server icon/banner):
-When a user provides a URL or references a Discord message attachment, use these params:
-- "url": Download from an HTTPS URL (e.g. user pastes a link to an image)
-- "message_id": ID of a Discord message that contains an attachment
-- "channel_id": Required when using message_id — the channel the message is in
+When a user provides a URL or references a Discord message attachment, use these FLAT params directly inside "params":
+- "url": Download from an HTTPS URL. Put the URL string directly as a flat param, NOT nested.
+- "message_id": ID of a Discord message that contains an attachment (integer)
+- "channel_id": Required when using message_id — the channel the message is in (integer)
 - "filename": (optional) Specific attachment filename if the message has multiple files
-Priority: raw bytes > message attachment > URL
-For emoji/sticker: the image param is "image" for emoji, "file" for sticker
-For soundboard: uses "message_id" to fetch audio from a message attachment
-For server icon/banner: action "edit_icon"/"edit_banner" accepts "url" or "message_id"+"channel_id"
+
+IMPORTANT: url must be a flat string param, NOT nested like {{"url": "..."}}. WRONG: {{"image": {{"url": "https://..."}}}}. CORRECT: {{"name": "myemoji", "url": "https://..."}}
+
+For emoji create: params = {{"name": "emoji_name", "url": "https://image-url.com/img.png"}}  (do NOT set "image" param when using url)
+For sticker create: params = {{"name": "sticker_name", "url": "https://image-url.com/img.png"}}  (do NOT set "file" param when using url)
+For soundboard create: params = {{"name": "sound_name", "message_id": 123456, "channel_id": 789012}}
+For server icon: action must be "edit_icon", params = {{"url": "https://image-url.com/icon.png"}}
+For server banner: action must be "edit_banner", params = {{"url": "https://image-url.com/banner.png"}}
 """
 
 SYSTEM_PROMPT = """You are a Discord server management assistant.

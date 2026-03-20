@@ -68,7 +68,7 @@ class StickerExecutionAgent(SingleActionExecutionAgent):
             "name": params["name"],
             "description": params.get("description", ""),
             "emoji": params.get("tags", params.get("emoji", "\U0001f4a9")),
-            "file": file,
+            "file": discord.File(file),
         }
 
         sticker = await guild.create_sticker(**kwargs)

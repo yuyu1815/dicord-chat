@@ -70,8 +70,10 @@ async def fetch_url_bytes(
     if _is_private_ip(hostname):
         raise AttachmentError(f"URL resolves to private IP, blocked for security")
 
+    headers = {"User-Agent": "DiscordBot/1.0 (image download)"}
+
     try:
-        async with aiohttp.ClientSession(timeout=DOWNLOAD_TIMEOUT) as session:
+        async with aiohttp.ClientSession(timeout=DOWNLOAD_TIMEOUT, headers=headers) as session:
             async with session.get(url) as resp:
                 if resp.status != 200:
                     raise AttachmentError(f"HTTP {resp.status} when downloading from '{hostname}'")
