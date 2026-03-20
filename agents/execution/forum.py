@@ -2,6 +2,7 @@ import discord
 
 from agents.base import MultiActionExecutionAgent
 from graph.state import AgentState
+from i18n import t
 
 
 class ForumExecutionAgent(MultiActionExecutionAgent):
@@ -31,7 +32,7 @@ class ForumExecutionAgent(MultiActionExecutionAgent):
         }
         handler = handlers.get(action)
         if not handler:
-            return {"success": False, "action": action, "details": f"Unknown action: {action}"}
+            return {"success": False, "action": action, "details": t("err.unknown_action", locale=self._locale, action=action)}
         return await handler(params, guild)
 
     async def _get_forum_channel(self, guild: discord.Guild, channel_id: int) -> discord.ForumChannel | None:
@@ -47,13 +48,13 @@ class ForumExecutionAgent(MultiActionExecutionAgent):
         title = params.get("title")
         content = params.get("content", "")
         if not forum_id:
-            return {"success": False, "action": "create_post", "details": "Missing 'forum_channel_id' parameter"}
+            return {"success": False, "action": "create_post", "details": t("exec.missing_param", locale=self._locale, param="forum_channel_id")}
         if not title:
-            return {"success": False, "action": "create_post", "details": "Missing 'title' parameter"}
+            return {"success": False, "action": "create_post", "details": t("exec.missing_param", locale=self._locale, param="title")}
 
         forum = await self._get_forum_channel(guild, forum_id)
         if not forum:
-            return {"success": False, "action": "create_post", "details": f"Forum channel {forum_id} not found"}
+            return {"success": False, "action": "create_post", "details": t("not_found.forum_channel", locale=self._locale, id=forum_id)}
 
         applied_tags = []
         tags_list = params.get("tags_list", [])
@@ -69,7 +70,7 @@ class ForumExecutionAgent(MultiActionExecutionAgent):
                 content=content,
                 applied_tags=applied_tags,
             )
-            return {"success": True, "action": "create_post", "details": f"Created forum post '{title}' ({thread.id})"}
+            return {"success": True, "action": "create_post", "details": t("exec.forum.post_created", locale=self._locale, title=title, id=thread.id)}
         except (discord.Forbidden, discord.HTTPException) as e:
             return {"success": False, "action": "create_post", "details": str(e)}
 
@@ -77,22 +78,22 @@ class ForumExecutionAgent(MultiActionExecutionAgent):
         """フォーラム投稿を編集する。"""
         message_id = params.get("message_id")
         if not message_id:
-            return {"success": False, "action": "edit_post", "details": "Missing 'message_id' parameter"}
+            return {"success": False, "action": "edit_post", "details": t("exec.missing_param", locale=self._locale, param="message_id")}
 
         content = params.get("content")
         if not content:
-            return {"success": False, "action": "edit_post", "details": "Missing 'content' parameter"}
+            return {"success": False, "action": "edit_post", "details": t("exec.missing_param", locale=self._locale, param="content")}
 
         try:
-            for channel in guild.text_channels:
+            for channel in guild.channels:
                 if isinstance(channel, discord.ForumChannel):
                     for thread in channel.threads:
                         if thread.owner_id:
                             msg = thread.get_partial_message(message_id)
                             await msg.edit(content=content)
-                            return {"success": True, "action": "edit_post", "details": f"Edited forum post message {message_id}"}
+                            return {"success": True, "action": "edit_post", "details": t("exec.forum.post_edited", locale=self._locale, id=message_id)}
 
-            return {"success": False, "action": "edit_post", "details": f"Could not find forum post with message {message_id}"}
+            return {"success": False, "action": "edit_post", "details": t("exec.forum.post_not_found", locale=self._locale, id=message_id)}
         except (discord.Forbidden, discord.HTTPException) as e:
             return {"success": False, "action": "edit_post", "details": str(e)}
 
@@ -100,18 +101,18 @@ class ForumExecutionAgent(MultiActionExecutionAgent):
         """フォーラム投稿を削除する。"""
         message_id = params.get("message_id")
         if not message_id:
-            return {"success": False, "action": "delete_post", "details": "Missing 'message_id' parameter"}
+            return {"success": False, "action": "delete_post", "details": t("exec.missing_param", locale=self._locale, param="message_id")}
 
         try:
-            for channel in guild.text_channels:
+            for channel in guild.channels:
                 if isinstance(channel, discord.ForumChannel):
                     for thread in channel.threads:
                         if thread.id == message_id or thread.starter_message_id == message_id:
                             thread_name = thread.name
                             await thread.delete()
-                            return {"success": True, "action": "delete_post", "details": f"Deleted forum post '{thread_name}'"}
+                            return {"success": True, "action": "delete_post", "details": t("exec.forum.post_deleted", locale=self._locale, name=thread_name)}
 
-            return {"success": False, "action": "delete_post", "details": f"Could not find forum post with message {message_id}"}
+            return {"success": False, "action": "delete_post", "details": t("exec.forum.post_not_found", locale=self._locale, id=message_id)}
         except (discord.Forbidden, discord.HTTPException) as e:
             return {"success": False, "action": "delete_post", "details": str(e)}
 
@@ -120,19 +121,19 @@ class ForumExecutionAgent(MultiActionExecutionAgent):
         forum_id = params.get("forum_channel_id")
         tag_name = params.get("name")
         if not forum_id:
-            return {"success": False, "action": "create_tag", "details": "Missing 'forum_channel_id' parameter"}
+            return {"success": False, "action": "create_tag", "details": t("exec.missing_param", locale=self._locale, param="forum_channel_id")}
         if not tag_name:
-            return {"success": False, "action": "create_tag", "details": "Missing 'name' parameter"}
+            return {"success": False, "action": "create_tag", "details": t("exec.missing_param", locale=self._locale, param="name")}
 
         forum = await self._get_forum_channel(guild, forum_id)
         if not forum:
-            return {"success": False, "action": "create_tag", "details": f"Forum channel {forum_id} not found"}
+            return {"success": False, "action": "create_tag", "details": t("not_found.forum_channel", locale=self._locale, id=forum_id)}
 
         emoji = params.get("emoji")
 
         try:
             tag = await forum.create_tag(name=tag_name, emoji=emoji)
-            return {"success": True, "action": "create_tag", "details": f"Created tag '{tag_name}' ({tag.id})"}
+            return {"success": True, "action": "create_tag", "details": t("exec.forum.tag_created", locale=self._locale, name=tag_name, id=tag.id)}
         except (discord.Forbidden, discord.HTTPException) as e:
             return {"success": False, "action": "create_tag", "details": str(e)}
 
@@ -141,17 +142,17 @@ class ForumExecutionAgent(MultiActionExecutionAgent):
         forum_id = params.get("forum_channel_id")
         tag_id = params.get("tag_id")
         if not forum_id:
-            return {"success": False, "action": "edit_tag", "details": "Missing 'forum_channel_id' parameter"}
+            return {"success": False, "action": "edit_tag", "details": t("exec.missing_param", locale=self._locale, param="forum_channel_id")}
         if not tag_id:
-            return {"success": False, "action": "edit_tag", "details": "Missing 'tag_id' parameter"}
+            return {"success": False, "action": "edit_tag", "details": t("exec.missing_param", locale=self._locale, param="tag_id")}
 
         forum = await self._get_forum_channel(guild, forum_id)
         if not forum:
-            return {"success": False, "action": "edit_tag", "details": f"Forum channel {forum_id} not found"}
+            return {"success": False, "action": "edit_tag", "details": t("not_found.forum_channel", locale=self._locale, id=forum_id)}
 
         tag = next((t for t in forum.available_tags if t.id == int(tag_id)), None)
         if not tag:
-            return {"success": False, "action": "edit_tag", "details": f"Tag {tag_id} not found in forum"}
+            return {"success": False, "action": "edit_tag", "details": t("exec.forum.tag_not_found", locale=self._locale, id=tag_id)}
 
         kwargs: dict = {}
         if "name" in params:
@@ -160,11 +161,11 @@ class ForumExecutionAgent(MultiActionExecutionAgent):
             kwargs["emoji"] = params["emoji"]
 
         if not kwargs:
-            return {"success": False, "action": "edit_tag", "details": "No editable parameters provided"}
+            return {"success": False, "action": "edit_tag", "details": t("exec.no_editable_params", locale=self._locale)}
 
         try:
             await tag.edit(**kwargs)
-            return {"success": True, "action": "edit_tag", "details": f"Edited tag to '{kwargs.get('name', tag.name)}'"}
+            return {"success": True, "action": "edit_tag", "details": t("exec.forum.tag_edited", locale=self._locale, data=kwargs.get('name', tag.name))}
         except (discord.Forbidden, discord.HTTPException) as e:
             return {"success": False, "action": "edit_tag", "details": str(e)}
 
@@ -173,21 +174,21 @@ class ForumExecutionAgent(MultiActionExecutionAgent):
         forum_id = params.get("forum_channel_id")
         tag_id = params.get("tag_id")
         if not forum_id:
-            return {"success": False, "action": "delete_tag", "details": "Missing 'forum_channel_id' parameter"}
+            return {"success": False, "action": "delete_tag", "details": t("exec.missing_param", locale=self._locale, param="forum_channel_id")}
         if not tag_id:
-            return {"success": False, "action": "delete_tag", "details": "Missing 'tag_id' parameter"}
+            return {"success": False, "action": "delete_tag", "details": t("exec.missing_param", locale=self._locale, param="tag_id")}
 
         forum = await self._get_forum_channel(guild, forum_id)
         if not forum:
-            return {"success": False, "action": "delete_tag", "details": f"Forum channel {forum_id} not found"}
+            return {"success": False, "action": "delete_tag", "details": t("not_found.forum_channel", locale=self._locale, id=forum_id)}
 
         tag = next((t for t in forum.available_tags if t.id == int(tag_id)), None)
         if not tag:
-            return {"success": False, "action": "delete_tag", "details": f"Tag {tag_id} not found in forum"}
+            return {"success": False, "action": "delete_tag", "details": t("exec.forum.tag_not_found", locale=self._locale, id=tag_id)}
 
         tag_name = tag.name
         try:
             await tag.delete()
-            return {"success": True, "action": "delete_tag", "details": f"Deleted tag '{tag_name}'"}
+            return {"success": True, "action": "delete_tag", "details": t("exec.forum.tag_deleted", locale=self._locale, name=tag_name)}
         except (discord.Forbidden, discord.HTTPException) as e:
             return {"success": False, "action": "delete_tag", "details": str(e)}

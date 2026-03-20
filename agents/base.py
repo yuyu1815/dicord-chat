@@ -2,7 +2,12 @@ from abc import ABC, abstractmethod
 import logging
 from typing import Any
 
+import discord
+from discord import HTTPException
+
+from agents.log import log_agent_call
 from graph.state import AgentState
+from i18n import t
 
 logger = logging.getLogger("discord_bot")
 
@@ -50,8 +55,10 @@ class InvestigationAgent(BaseAgent):
     async def run(self, state: AgentState, guild: Any) -> AgentState:
         if "investigation_results" not in state:
             state["investigation_results"] = {}
+        await log_agent_call(self.name, "investigation.run.start", state, guild=guild)
         result = await self.investigate(state, guild)
         state["investigation_results"][self.name] = result
+        await log_agent_call(self.name, "investigation.run.end", state, guild=guild, result=result)
         return state
 
     @abstractmethod
@@ -83,6 +90,7 @@ class ExecutionAgent(BaseAgent):
         if not state.get("approved"):
             raise PermissionError(f"[{self.name}] Execution requires user approval.")
 
+        await log_agent_call(self.name, "execution.run.start", state, guild=guild)
         user_perms = state.get("user_permissions", {})
         has_admin = user_perms.get("administrator", False)
         agent_todos = [todo for todo in state.get("todos", []) if todo.get("agent") == self.name]
@@ -99,7 +107,7 @@ class ExecutionAgent(BaseAgent):
                     blocked_count += 1
                     denied.append({
                         "action": action,
-                        "message": f"このユーザーの権限では実行できません（必要な権限: {', '.join(missing)}）",
+                        "message": t("perm.denied", locale=state.get("locale", "en"), permissions=", ".join(missing)),
                     })
 
         if "execution_results" not in state:
@@ -109,9 +117,10 @@ class ExecutionAgent(BaseAgent):
             result: dict[str, Any] = {
                 "success": False,
                 "permission_denied": denied,
-                "details": "全アクションが権限不足によりブロックされました",
+                "details": t("perm.all_blocked", locale=state.get("locale", "en")),
             }
             state["execution_results"][self.name] = result
+            await log_agent_call(self.name, "execution.run.blocked", state, guild=guild, result=result)
             return state
 
         execution_state = dict(state)
@@ -127,6 +136,7 @@ class ExecutionAgent(BaseAgent):
             result["permission_denied"] = existing + denied
 
         state["execution_results"][self.name] = result
+        await log_agent_call(self.name, "execution.run.end", execution_state, guild=guild, result=result)
         return state
 
     @abstractmethod
@@ -161,24 +171,30 @@ class SingleActionExecutionAgent(ExecutionAgent):
     not_found_message: str = "Target not found."
 
     async def execute(self, state: AgentState, guild: Any) -> dict[str, Any]:
+        self._locale = state.get("locale", "en")
         action_name = _find_action(state, self.name)
         if not action_name:
-            return {"success": False, "action": "none", "details": "No matching todo found."}
+            return {"success": False, "action": "none", "details": t("err.no_matching_todo", locale=self._locale)}
 
         if action_name not in self.ACTION_HANDLERS:
-            return {"success": False, "action": action_name, "details": f"Unknown action: {action_name}"}
+            return {"success": False, "action": action_name, "details": t("err.unknown_action", locale=self._locale, action=action_name)}
 
         params = next(
             (t["params"] for t in state["todos"] if t.get("agent") == self.name and t.get("action") == action_name),
             {},
         )
+        await log_agent_call(self.name, "execution.action.start", state, guild=guild, action=action_name)
 
         try:
-            return await getattr(self, f"_do_{action_name}")(guild, params)
+            result = await getattr(self, f"_do_{action_name}")(guild, params)
+            await log_agent_call(self.name, "execution.action.end", state, guild=guild, action=action_name, result=result)
+            return result
         except PermissionError:
             raise
         except Exception as exc:
-            return self._handle_error(exc, action_name)
+            result = self._handle_error(exc, action_name)
+            await log_agent_call(self.name, "execution.action.error", state, guild=guild, action=action_name, result=result)
+            return result
 
     def _handle_error(self, exc: Exception, action_name: str) -> dict[str, Any]:
         """例外を結果辞書に変換する。
@@ -190,17 +206,15 @@ class SingleActionExecutionAgent(ExecutionAgent):
         Returns:
             エラー結果の辞書。
         """
-        import discord
-        from discord import HTTPException
-
+        locale = getattr(self, "_locale", "en")
         if isinstance(exc, discord.Forbidden):
-            return {"success": False, "action": action_name, "details": "Missing permissions."}
+            return {"success": False, "action": action_name, "details": t("err.missing_permissions", locale=locale)}
         if isinstance(exc, discord.NotFound):
             return {"success": False, "action": action_name, "details": self.not_found_message}
         if isinstance(exc, HTTPException):
-            return {"success": False, "action": action_name, "details": f"API error: {exc.text}"}
+            return {"success": False, "action": action_name, "details": t("err.api_error", locale=locale, text=exc.text)}
         logger.warning("Unexpected error in %s/%s: %s", self.name, action_name, exc)
-        return {"success": False, "action": action_name, "details": f"Unexpected error: {exc}"}
+        return {"success": False, "action": action_name, "details": t("err.unexpected", locale=locale, error=exc)}
 
 
 class MultiActionExecutionAgent(ExecutionAgent):
@@ -215,16 +229,19 @@ class MultiActionExecutionAgent(ExecutionAgent):
     """
 
     async def execute(self, state: AgentState, guild: Any) -> dict[str, Any]:
+        self._locale = state.get("locale", "en")
         todos = state.get("todos", [])
         my_todos = [t for t in todos if t.get("agent") == self.name and not t.get("_blocked")]
         if not my_todos:
-            return {"success": False, "action": "none", "details": "No matching action found"}
+            return {"success": False, "action": "none", "details": t("err.no_matching_action", locale=self._locale)}
 
         results = []
         for todo in my_todos:
             action = todo.get("action", "")
             params = todo.get("params", {})
+            await log_agent_call(self.name, "execution.action.start", state, guild=guild, action=action)
             result = await self._dispatch(action, params, guild)
+            await log_agent_call(self.name, "execution.action.end", state, guild=guild, action=action, result=result)
             results.append(result)
 
         details = "; ".join(r["details"] for r in results)

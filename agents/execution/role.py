@@ -1,5 +1,7 @@
 import discord
 
+from i18n import t
+
 from agents.base import MultiActionExecutionAgent
 from graph.state import AgentState
 
@@ -31,14 +33,14 @@ class RoleExecutionAgent(MultiActionExecutionAgent):
         }
         handler = handlers.get(action)
         if not handler:
-            return {"success": False, "action": action, "details": f"Unknown action: {action}"}
+            return {"success": False, "action": action, "details": t("err.unknown_action", locale=self._locale, action=action)}
         return await handler(params, guild)
 
     async def _create(self, params: dict, guild: discord.Guild) -> dict:
         """ロールを作成する。"""
         name = params.get("name")
         if not name:
-            return {"success": False, "action": "create", "details": "Missing 'name' parameter"}
+            return {"success": False, "action": "create", "details": t("exec.missing_param", locale=self._locale, param="name")}
 
         kwargs: dict = {"name": name}
 
@@ -53,7 +55,7 @@ class RoleExecutionAgent(MultiActionExecutionAgent):
 
         try:
             role = await guild.create_role(**kwargs)
-            return {"success": True, "action": "create", "details": f"Created role '{role.name}' ({role.id})"}
+            return {"success": True, "action": "create", "details": t("exec.role.created", locale=self._locale, name=role.name, id=role.id)}
         except (discord.Forbidden, discord.HTTPException) as e:
             return {"success": False, "action": "create", "details": str(e)}
 
@@ -61,11 +63,11 @@ class RoleExecutionAgent(MultiActionExecutionAgent):
         """ロールを編集する。"""
         role_id = params.get("role_id")
         if not role_id:
-            return {"success": False, "action": "edit", "details": "Missing 'role_id' parameter"}
+            return {"success": False, "action": "edit", "details": t("exec.missing_param", locale=self._locale, param="role_id")}
 
         role = guild.get_role(role_id)
         if not role:
-            return {"success": False, "action": "edit", "details": f"Role {role_id} not found"}
+            return {"success": False, "action": "edit", "details": t("not_found.role", locale=self._locale, id=role_id)}
 
         kwargs: dict = {}
         if "name" in params:
@@ -80,11 +82,11 @@ class RoleExecutionAgent(MultiActionExecutionAgent):
             kwargs["mentionable"] = params["mentionable"]
 
         if not kwargs:
-            return {"success": False, "action": "edit", "details": "No editable parameters provided"}
+            return {"success": False, "action": "edit", "details": t("exec.no_editable_params", locale=self._locale)}
 
         try:
             await role.edit(**kwargs)
-            return {"success": True, "action": "edit", "details": f"Edited role '{role.name}'"}
+            return {"success": True, "action": "edit", "details": t("exec.role.edited", locale=self._locale, name=role.name)}
         except (discord.Forbidden, discord.HTTPException) as e:
             return {"success": False, "action": "edit", "details": str(e)}
 
@@ -92,16 +94,16 @@ class RoleExecutionAgent(MultiActionExecutionAgent):
         """ロールを削除する。"""
         role_id = params.get("role_id")
         if not role_id:
-            return {"success": False, "action": "delete", "details": "Missing 'role_id' parameter"}
+            return {"success": False, "action": "delete", "details": t("exec.missing_param", locale=self._locale, param="role_id")}
 
         role = guild.get_role(role_id)
         if not role:
-            return {"success": False, "action": "delete", "details": f"Role {role_id} not found"}
+            return {"success": False, "action": "delete", "details": t("not_found.role", locale=self._locale, id=role_id)}
 
         role_name = role.name
         try:
             await role.delete()
-            return {"success": True, "action": "delete", "details": f"Deleted role '{role_name}'"}
+            return {"success": True, "action": "delete", "details": t("exec.role.deleted", locale=self._locale, name=role_name)}
         except (discord.Forbidden, discord.HTTPException) as e:
             return {"success": False, "action": "delete", "details": str(e)}
 
@@ -109,11 +111,11 @@ class RoleExecutionAgent(MultiActionExecutionAgent):
         """ロールの並び順を変更する。"""
         roles = params.get("roles", [])
         if not roles:
-            return {"success": False, "action": "reorder", "details": "Missing 'roles' parameter"}
+            return {"success": False, "action": "reorder", "details": t("exec.missing_param", locale=self._locale, param="roles")}
 
         try:
             await guild.edit_role_positions(roles)
-            return {"success": True, "action": "reorder", "details": f"Reordered {len(roles)} role(s)"}
+            return {"success": True, "action": "reorder", "details": t("exec.role.reordered", locale=self._locale, count=len(roles))}
         except (discord.Forbidden, discord.HTTPException) as e:
             return {"success": False, "action": "reorder", "details": str(e)}
 
@@ -122,21 +124,21 @@ class RoleExecutionAgent(MultiActionExecutionAgent):
         member_id = params.get("member_id")
         role_id = params.get("role_id")
         if not member_id:
-            return {"success": False, "action": "assign", "details": "Missing 'member_id' parameter"}
+            return {"success": False, "action": "assign", "details": t("exec.missing_param", locale=self._locale, param="member_id")}
         if not role_id:
-            return {"success": False, "action": "assign", "details": "Missing 'role_id' parameter"}
+            return {"success": False, "action": "assign", "details": t("exec.missing_param", locale=self._locale, param="role_id")}
 
         member = guild.get_member(member_id)
         if not member:
-            return {"success": False, "action": "assign", "details": f"Member {member_id} not found"}
+            return {"success": False, "action": "assign", "details": t("not_found.member", locale=self._locale, id=member_id)}
 
         role = guild.get_role(role_id)
         if not role:
-            return {"success": False, "action": "assign", "details": f"Role {role_id} not found"}
+            return {"success": False, "action": "assign", "details": t("not_found.role", locale=self._locale, id=role_id)}
 
         try:
             await member.add_roles(role)
-            return {"success": True, "action": "assign", "details": f"Assigned '{role.name}' to {member.display_name}"}
+            return {"success": True, "action": "assign", "details": t("exec.role.assigned", locale=self._locale, role=role.name, member=member.display_name)}
         except (discord.Forbidden, discord.HTTPException) as e:
             return {"success": False, "action": "assign", "details": str(e)}
 
@@ -145,20 +147,20 @@ class RoleExecutionAgent(MultiActionExecutionAgent):
         member_id = params.get("member_id")
         role_id = params.get("role_id")
         if not member_id:
-            return {"success": False, "action": "revoke", "details": "Missing 'member_id' parameter"}
+            return {"success": False, "action": "revoke", "details": t("exec.missing_param", locale=self._locale, param="member_id")}
         if not role_id:
-            return {"success": False, "action": "revoke", "details": "Missing 'role_id' parameter"}
+            return {"success": False, "action": "revoke", "details": t("exec.missing_param", locale=self._locale, param="role_id")}
 
         member = guild.get_member(member_id)
         if not member:
-            return {"success": False, "action": "revoke", "details": f"Member {member_id} not found"}
+            return {"success": False, "action": "revoke", "details": t("not_found.member", locale=self._locale, id=member_id)}
 
         role = guild.get_role(role_id)
         if not role:
-            return {"success": False, "action": "revoke", "details": f"Role {role_id} not found"}
+            return {"success": False, "action": "revoke", "details": t("not_found.role", locale=self._locale, id=role_id)}
 
         try:
             await member.remove_roles(role)
-            return {"success": True, "action": "revoke", "details": f"Revoked '{role.name}' from {member.display_name}"}
+            return {"success": True, "action": "revoke", "details": t("exec.role.revoked", locale=self._locale, role=role.name, member=member.display_name)}
         except (discord.Forbidden, discord.HTTPException) as e:
             return {"success": False, "action": "revoke", "details": str(e)}

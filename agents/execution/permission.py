@@ -1,5 +1,7 @@
 import discord
 
+from i18n import t
+
 from agents.base import MultiActionExecutionAgent
 from graph.state import AgentState
 
@@ -25,7 +27,7 @@ class PermissionExecutionAgent(MultiActionExecutionAgent):
         }
         handler = handlers.get(action)
         if not handler:
-            return {"success": False, "action": action, "details": f"Unknown action: {action}"}
+            return {"success": False, "action": action, "details": t("err.unknown_action", locale=self._locale, action=action)}
         return await handler(params, guild)
 
     def _resolve_target(self, guild: discord.Guild, target_type: str, target_id: int) -> discord.Role | discord.Member | None:
@@ -40,18 +42,18 @@ class PermissionExecutionAgent(MultiActionExecutionAgent):
         target_type = params.get("target_type", "role")
         target_id = params.get("target_id")
         if not channel_id:
-            return {"success": False, "action": "set_channel_permission", "details": "Missing 'channel_id' parameter"}
+            return {"success": False, "action": "set_channel_permission", "details": t("exec.missing_param", locale=self._locale, param="channel_id")}
         if not target_id:
-            return {"success": False, "action": "set_channel_permission", "details": "Missing 'target_id' parameter"}
+            return {"success": False, "action": "set_channel_permission", "details": t("exec.missing_param", locale=self._locale, param="target_id")}
 
         channel = guild.get_channel(channel_id)
         if not channel:
-            return {"success": False, "action": "set_channel_permission", "details": f"Channel {channel_id} not found"}
+            return {"success": False, "action": "set_channel_permission", "details": t("not_found.channel", locale=self._locale, id=channel_id)}
 
         target = self._resolve_target(guild, target_type, target_id)
         if not target:
             label = "Member" if target_type == "member" else "Role"
-            return {"success": False, "action": "set_channel_permission", "details": f"{label} {target_id} not found"}
+            return {"success": False, "action": "set_channel_permission", "details": t("exec.permission.label_not_found", locale=self._locale, label=label, id=target_id)}
 
         allow_perms = params.get("allow_perms", 0)
         deny_perms = params.get("deny_perms", 0)
@@ -64,7 +66,7 @@ class PermissionExecutionAgent(MultiActionExecutionAgent):
         try:
             await channel.set_permissions(target, overwrite=overwrite)
             target_name = target.display_name if hasattr(target, "display_name") else target.name
-            return {"success": True, "action": "set_channel_permission", "details": f"Set permissions for {target_name} on #{channel.name}"}
+            return {"success": True, "action": "set_channel_permission", "details": t("exec.permission.set", locale=self._locale, target=target_name, channel=channel.name)}
         except (discord.Forbidden, discord.HTTPException) as e:
             return {"success": False, "action": "set_channel_permission", "details": str(e)}
 
@@ -73,22 +75,22 @@ class PermissionExecutionAgent(MultiActionExecutionAgent):
         channel_id = params.get("channel_id")
         overwrite_id = params.get("overwrite_id")
         if not channel_id:
-            return {"success": False, "action": "delete_channel_permission", "details": "Missing 'channel_id' parameter"}
+            return {"success": False, "action": "delete_channel_permission", "details": t("exec.missing_param", locale=self._locale, param="channel_id")}
         if not overwrite_id:
-            return {"success": False, "action": "delete_channel_permission", "details": "Missing 'overwrite_id' parameter"}
+            return {"success": False, "action": "delete_channel_permission", "details": t("exec.missing_param", locale=self._locale, param="overwrite_id")}
 
         channel = guild.get_channel(channel_id)
         if not channel:
-            return {"success": False, "action": "delete_channel_permission", "details": f"Channel {channel_id} not found"}
+            return {"success": False, "action": "delete_channel_permission", "details": t("not_found.channel", locale=self._locale, id=channel_id)}
 
         target = guild.get_role(overwrite_id) or guild.get_member(overwrite_id)
         if not target:
-            return {"success": False, "action": "delete_channel_permission", "details": f"Target {overwrite_id} not found"}
+            return {"success": False, "action": "delete_channel_permission", "details": t("exec.permission.target_not_found", locale=self._locale, id=overwrite_id)}
 
         try:
             await channel.set_permissions(target, overwrite=None)
             target_name = target.display_name if hasattr(target, "display_name") else target.name
-            return {"success": True, "action": "delete_channel_permission", "details": f"Cleared permissions for {target_name} on #{channel.name}"}
+            return {"success": True, "action": "delete_channel_permission", "details": t("exec.permission.cleared", locale=self._locale, target=target_name, channel=channel.name)}
         except (discord.Forbidden, discord.HTTPException) as e:
             return {"success": False, "action": "delete_channel_permission", "details": str(e)}
 
@@ -97,11 +99,11 @@ class PermissionExecutionAgent(MultiActionExecutionAgent):
         channel_id = params.get("channel_id")
         category_id = params.get("category_id")
         if not channel_id:
-            return {"success": False, "action": "sync_permissions", "details": "Missing 'channel_id' parameter"}
+            return {"success": False, "action": "sync_permissions", "details": t("exec.missing_param", locale=self._locale, param="channel_id")}
 
         channel = guild.get_channel(channel_id)
         if not channel:
-            return {"success": False, "action": "sync_permissions", "details": f"Channel {channel_id} not found"}
+            return {"success": False, "action": "sync_permissions", "details": t("not_found.channel", locale=self._locale, id=channel_id)}
 
         if category_id:
             category = guild.get_channel(category_id)
@@ -109,10 +111,10 @@ class PermissionExecutionAgent(MultiActionExecutionAgent):
                 try:
                     await channel.edit(category=category)
                 except (discord.Forbidden, discord.HTTPException):
-                    return {"success": False, "action": "sync_permissions", "details": f"Failed to move channel to category {category_id}"}
+                    return {"success": False, "action": "sync_permissions", "details": t("exec.permission.move_failed", locale=self._locale, id=category_id)}
 
         try:
             await channel.edit(sync_permissions=True)
-            return {"success": True, "action": "sync_permissions", "details": f"Synced permissions for #{channel.name} with its category"}
+            return {"success": True, "action": "sync_permissions", "details": t("exec.permission.synced", locale=self._locale, channel=channel.name)}
         except (discord.Forbidden, discord.HTTPException) as e:
             return {"success": False, "action": "sync_permissions", "details": str(e)}

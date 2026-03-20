@@ -4,6 +4,7 @@ import discord
 
 from agents.base import SingleActionExecutionAgent
 from graph.state import AgentState
+from i18n import t
 
 NAME = "sticker_execution"
 
@@ -36,7 +37,7 @@ class StickerExecutionAgent(SingleActionExecutionAgent):
 
     def _resolve_file(self, data: bytes | None) -> io.IOBase:
         if data is None:
-            raise ValueError("Sticker file data is required.")
+            raise ValueError(t("exec.sticker.data_required", locale=self._locale))
         return io.BytesIO(data)
 
     def _resolve_format(self, raw: str | None) -> int:
@@ -58,12 +59,12 @@ class StickerExecutionAgent(SingleActionExecutionAgent):
             kwargs["tags"] = params["tags"]
 
         sticker = await guild.create_sticker(**kwargs)
-        return {"success": True, "action": "create", "details": f"Created sticker '{sticker.name}'."}
+        return {"success": True, "action": "create", "details": t("exec.sticker.created", locale=self._locale, name=sticker.name)}
 
     async def _do_edit(self, guild: discord.Guild, params: dict) -> dict:
         sticker = guild.get_sticker(params["sticker_id"])
         if not sticker:
-            return {"success": False, "action": "edit", "details": "Sticker not found."}
+            return {"success": False, "action": "edit", "details": t("exec.sticker.not_found", locale=self._locale)}
 
         kwargs: dict = {}
         if "name" in params:
@@ -74,11 +75,11 @@ class StickerExecutionAgent(SingleActionExecutionAgent):
             kwargs["tags"] = params["tags"]
 
         await sticker.edit(**kwargs)
-        return {"success": True, "action": "edit", "details": f"Edited sticker '{sticker.name}'."}
+        return {"success": True, "action": "edit", "details": t("exec.sticker.edited", locale=self._locale, name=sticker.name)}
 
     async def _do_delete(self, guild: discord.Guild, params: dict) -> dict:
         sticker = guild.get_sticker(params["sticker_id"])
         if not sticker:
-            return {"success": False, "action": "delete", "details": "Sticker not found."}
+            return {"success": False, "action": "delete", "details": t("exec.sticker.not_found", locale=self._locale)}
         await sticker.delete()
-        return {"success": True, "action": "delete", "details": f"Deleted sticker '{sticker.name}'."}
+        return {"success": True, "action": "delete", "details": t("exec.sticker.deleted", locale=self._locale, name=sticker.name)}

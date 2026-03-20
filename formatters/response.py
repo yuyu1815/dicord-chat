@@ -9,6 +9,7 @@ import logging
 from typing import Any
 
 from graph.state import AgentState, is_execution_todo
+from i18n import t
 
 logger = logging.getLogger("discord_bot")
 
@@ -35,25 +36,27 @@ def format_final_response(state: AgentState) -> str:
     Returns:
         フォーマットされた文字列。
     """
+    locale = state.get("locale", "en")
     parts = []
 
     execution_results = state.get("execution_results", {})
     if execution_results:
-        parts.append(format_results(execution_results, title="Execution Results"))
+        parts.append(format_results(execution_results, title=t("fmt.execution_results", locale=locale), locale=locale))
 
     final_response = state.get("final_response", "")
-    if final_response and final_response != "Done.":
+    if final_response and final_response != t("fmt.done", locale=locale):
         parts.append(final_response)
 
-    return "\n".join(parts) if parts else "Done."
+    return "\n".join(parts) if parts else t("fmt.done", locale=locale)
 
 
-def format_results(results: dict[str, Any], title: str) -> str:
+def format_results(results: dict[str, Any], title: str, locale: str = "en") -> str:
     """調査/実行結果をDiscord向けにフォーマットする。
 
     Args:
         results: エージェントの実行結果。
         title: セクションタイトル。
+        locale: 言語コード。
 
     Returns:
         フォーマットされた文字列。
@@ -64,14 +67,14 @@ def format_results(results: dict[str, Any], title: str) -> str:
     lines = [f"**{title}**\n"]
     for key, value in results.items():
         if isinstance(value, dict) and "error" in value:
-            lines.append(f"- {key}: ERROR - {value['error']}")
+            lines.append(f"- {key}: {t('fmt.error_marker', locale=locale, error=value['error'])}")
             continue
         lines.append(f"- {key}:")
         if isinstance(value, list):
             for item in value[:10]:
                 lines.append(f"  - {item}")
             if len(value) > 10:
-                lines.append(f"  - ... and {len(value) - 10} more")
+                lines.append(f"  - {t('fmt.and_more', locale=locale, count=len(value) - 10)}")
         elif isinstance(value, dict):
             denied = value.get("permission_denied", [])
             if denied:
@@ -88,11 +91,12 @@ def format_results(results: dict[str, Any], title: str) -> str:
     return "\n".join(lines)
 
 
-def format_execution_candidates(todos: list[dict[str, Any]]) -> str:
+def format_execution_candidates(todos: list[dict[str, Any]], locale: str = "en") -> str:
     """ユーザー確認用の実行候補リストをフォーマットする。
 
     Args:
         todos: 全タスクリスト。
+        locale: 言語コード。
 
     Returns:
         フォーマットされた文字列。
@@ -101,7 +105,7 @@ def format_execution_candidates(todos: list[dict[str, Any]]) -> str:
     if not execution_todos:
         return ""
 
-    lines = ["**Pending Execution (requires approval):**\n"]
+    lines = [t("fmt.pending_execution", locale=locale)]
     for i, todo in enumerate(execution_todos, 1):
         action = todo.get("action", "unknown")
         params = todo.get("params", {})

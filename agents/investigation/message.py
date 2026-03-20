@@ -2,6 +2,7 @@ import discord
 
 from agents.base import InvestigationAgent
 from graph.state import AgentState
+from i18n import t
 
 MAX_CONTENT_LENGTH = 200
 DEFAULT_FETCH_LIMIT = 20
@@ -26,14 +27,14 @@ class MessageInvestigationAgent(InvestigationAgent):
         """
         channel_id = state.get("channel_id")
         if channel_id is None:
-            return {"error": "channel_id is required in state"}
+            return {"error": t("inv.channel_required", locale=state.get("locale", "en"))}
 
         channel = guild.get_channel(channel_id)
         if channel is None:
-            return {"error": f"channel {channel_id} not found in guild"}
+            return {"error": t("inv.channel_not_found", locale=state.get("locale", "en"), id=channel_id)}
 
         if not isinstance(channel, discord.abc.Messageable):
-            return {"error": f"channel {channel_id} is not messageable"}
+            return {"error": t("inv.channel_not_messageable", locale=state.get("locale", "en"), id=channel_id)}
 
         messages = []
         async for msg in channel.history(limit=DEFAULT_FETCH_LIMIT):

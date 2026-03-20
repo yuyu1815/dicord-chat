@@ -2,6 +2,7 @@ import discord
 
 from agents.base import InvestigationAgent
 from graph.state import AgentState
+from i18n import t
 
 KEY_PERMISSIONS = [
     "administrator",
@@ -42,7 +43,7 @@ class PermissionInvestigationAgent(InvestigationAgent):
 
         channel = guild.get_channel(channel_id)
         if channel is None:
-            return {"error": f"channel {channel_id} not found in guild"}
+            return {"error": t("inv.channel_not_found", locale=state.get("locale", "en"), id=channel_id)}
 
         return await self._channel_overwrites(channel, guild)
 

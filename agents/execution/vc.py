@@ -2,6 +2,7 @@ import discord
 
 from agents.base import MultiActionExecutionAgent
 from graph.state import AgentState
+from i18n import t
 
 
 class VoiceChannelExecutionAgent(MultiActionExecutionAgent):
@@ -33,7 +34,7 @@ class VoiceChannelExecutionAgent(MultiActionExecutionAgent):
         }
         handler = handlers.get(action)
         if not handler:
-            return {"success": False, "action": action, "details": f"Unknown action: {action}"}
+            return {"success": False, "action": action, "details": t("err.unknown_action", locale=self._locale, action=action)}
         return await handler(params, guild)
 
     async def _move_user(self, params: dict, guild: discord.Guild) -> dict:
@@ -41,21 +42,21 @@ class VoiceChannelExecutionAgent(MultiActionExecutionAgent):
         user_id = params.get("user_id")
         channel_id = params.get("channel_id")
         if not user_id:
-            return {"success": False, "action": "move_user", "details": "Missing 'user_id' parameter"}
+            return {"success": False, "action": "move_user", "details": t("exec.missing_param", locale=self._locale, param="user_id")}
         if not channel_id:
-            return {"success": False, "action": "move_user", "details": "Missing 'channel_id' parameter"}
+            return {"success": False, "action": "move_user", "details": t("exec.missing_param", locale=self._locale, param="channel_id")}
 
         member = guild.get_member(user_id)
         if not member:
-            return {"success": False, "action": "move_user", "details": f"Member {user_id} not found"}
+            return {"success": False, "action": "move_user", "details": t("not_found.member", locale=self._locale, id=user_id)}
 
         channel = guild.get_channel(channel_id)
         if not channel or not isinstance(channel, discord.VoiceChannel):
-            return {"success": False, "action": "move_user", "details": f"Voice channel {channel_id} not found"}
+            return {"success": False, "action": "move_user", "details": t("not_found.voice_channel", locale=self._locale, id=channel_id)}
 
         try:
             await member.move_to(channel)
-            return {"success": True, "action": "move_user", "details": f"Moved {member.display_name} to {channel.name}"}
+            return {"success": True, "action": "move_user", "details": t("exec.vc.moved", locale=self._locale, member=member.display_name, channel=channel.name)}
         except (discord.Forbidden, discord.HTTPException) as e:
             return {"success": False, "action": "move_user", "details": str(e)}
 
@@ -63,15 +64,15 @@ class VoiceChannelExecutionAgent(MultiActionExecutionAgent):
         """メンバーをサーバーミュートにする。"""
         user_id = params.get("user_id")
         if not user_id:
-            return {"success": False, "action": "mute", "details": "Missing 'user_id' parameter"}
+            return {"success": False, "action": "mute", "details": t("exec.missing_param", locale=self._locale, param="user_id")}
 
         member = guild.get_member(user_id)
         if not member:
-            return {"success": False, "action": "mute", "details": f"Member {user_id} not found"}
+            return {"success": False, "action": "mute", "details": t("not_found.member", locale=self._locale, id=user_id)}
 
         try:
             await member.edit(mute=True)
-            return {"success": True, "action": "mute", "details": f"Server-muted {member.display_name}"}
+            return {"success": True, "action": "mute", "details": t("exec.vc.muted", locale=self._locale, member=member.display_name)}
         except (discord.Forbidden, discord.HTTPException) as e:
             return {"success": False, "action": "mute", "details": str(e)}
 
@@ -79,15 +80,15 @@ class VoiceChannelExecutionAgent(MultiActionExecutionAgent):
         """メンバーのサーバーミュートを解除する。"""
         user_id = params.get("user_id")
         if not user_id:
-            return {"success": False, "action": "unmute", "details": "Missing 'user_id' parameter"}
+            return {"success": False, "action": "unmute", "details": t("exec.missing_param", locale=self._locale, param="user_id")}
 
         member = guild.get_member(user_id)
         if not member:
-            return {"success": False, "action": "unmute", "details": f"Member {user_id} not found"}
+            return {"success": False, "action": "unmute", "details": t("not_found.member", locale=self._locale, id=user_id)}
 
         try:
             await member.edit(mute=False)
-            return {"success": True, "action": "unmute", "details": f"Server-unmuted {member.display_name}"}
+            return {"success": True, "action": "unmute", "details": t("exec.vc.unmuted", locale=self._locale, member=member.display_name)}
         except (discord.Forbidden, discord.HTTPException) as e:
             return {"success": False, "action": "unmute", "details": str(e)}
 
@@ -95,15 +96,15 @@ class VoiceChannelExecutionAgent(MultiActionExecutionAgent):
         """メンバーをサーバー聴覚禁止にする。"""
         user_id = params.get("user_id")
         if not user_id:
-            return {"success": False, "action": "deafen", "details": "Missing 'user_id' parameter"}
+            return {"success": False, "action": "deafen", "details": t("exec.missing_param", locale=self._locale, param="user_id")}
 
         member = guild.get_member(user_id)
         if not member:
-            return {"success": False, "action": "deafen", "details": f"Member {user_id} not found"}
+            return {"success": False, "action": "deafen", "details": t("not_found.member", locale=self._locale, id=user_id)}
 
         try:
             await member.edit(deafen=True)
-            return {"success": True, "action": "deafen", "details": f"Server-deafened {member.display_name}"}
+            return {"success": True, "action": "deafen", "details": t("exec.vc.deafened", locale=self._locale, member=member.display_name)}
         except (discord.Forbidden, discord.HTTPException) as e:
             return {"success": False, "action": "deafen", "details": str(e)}
 
@@ -111,15 +112,15 @@ class VoiceChannelExecutionAgent(MultiActionExecutionAgent):
         """メンバーのサーバー聴覚禁止を解除する。"""
         user_id = params.get("user_id")
         if not user_id:
-            return {"success": False, "action": "undeafen", "details": "Missing 'user_id' parameter"}
+            return {"success": False, "action": "undeafen", "details": t("exec.missing_param", locale=self._locale, param="user_id")}
 
         member = guild.get_member(user_id)
         if not member:
-            return {"success": False, "action": "undeafen", "details": f"Member {user_id} not found"}
+            return {"success": False, "action": "undeafen", "details": t("not_found.member", locale=self._locale, id=user_id)}
 
         try:
             await member.edit(deafen=False)
-            return {"success": True, "action": "undeafen", "details": f"Server-undeafened {member.display_name}"}
+            return {"success": True, "action": "undeafen", "details": t("exec.vc.undeafened", locale=self._locale, member=member.display_name)}
         except (discord.Forbidden, discord.HTTPException) as e:
             return {"success": False, "action": "undeafen", "details": str(e)}
 
@@ -127,15 +128,15 @@ class VoiceChannelExecutionAgent(MultiActionExecutionAgent):
         """メンバーをボイスチャンネルから切断する。"""
         user_id = params.get("user_id")
         if not user_id:
-            return {"success": False, "action": "disconnect", "details": "Missing 'user_id' parameter"}
+            return {"success": False, "action": "disconnect", "details": t("exec.missing_param", locale=self._locale, param="user_id")}
 
         member = guild.get_member(user_id)
         if not member:
-            return {"success": False, "action": "disconnect", "details": f"Member {user_id} not found"}
+            return {"success": False, "action": "disconnect", "details": t("not_found.member", locale=self._locale, id=user_id)}
 
         try:
             await member.move_to(None)
-            return {"success": True, "action": "disconnect", "details": f"Disconnected {member.display_name} from voice"}
+            return {"success": True, "action": "disconnect", "details": t("exec.vc.disconnected", locale=self._locale, member=member.display_name)}
         except (discord.Forbidden, discord.HTTPException) as e:
             return {"success": False, "action": "disconnect", "details": str(e)}
 
@@ -143,11 +144,11 @@ class VoiceChannelExecutionAgent(MultiActionExecutionAgent):
         """ボイスチャンネルの設定を編集する。"""
         channel_id = params.get("channel_id")
         if not channel_id:
-            return {"success": False, "action": "edit_channel", "details": "Missing 'channel_id' parameter"}
+            return {"success": False, "action": "edit_channel", "details": t("exec.missing_param", locale=self._locale, param="channel_id")}
 
         channel = guild.get_channel(channel_id)
         if not channel or not isinstance(channel, discord.VoiceChannel):
-            return {"success": False, "action": "edit_channel", "details": f"Voice channel {channel_id} not found"}
+            return {"success": False, "action": "edit_channel", "details": t("not_found.voice_channel", locale=self._locale, id=channel_id)}
 
         kwargs: dict = {}
         if "name" in params:
@@ -158,10 +159,10 @@ class VoiceChannelExecutionAgent(MultiActionExecutionAgent):
             kwargs["user_limit"] = params["user_limit"]
 
         if not kwargs:
-            return {"success": False, "action": "edit_channel", "details": "No editable parameters provided"}
+            return {"success": False, "action": "edit_channel", "details": t("exec.no_editable_params", locale=self._locale)}
 
         try:
             await channel.edit(**kwargs)
-            return {"success": True, "action": "edit_channel", "details": f"Edited voice channel '{channel.name}'"}
+            return {"success": True, "action": "edit_channel", "details": t("exec.vc.edited", locale=self._locale, name=channel.name)}
         except (discord.Forbidden, discord.HTTPException) as e:
             return {"success": False, "action": "edit_channel", "details": str(e)}

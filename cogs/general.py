@@ -2,6 +2,8 @@ import discord
 from discord.ext import commands
 from discord.ext.commands import Context
 
+from i18n import t, get_locale_from_ctx
+
 
 class General(commands.Cog, name="general"):
     """汎用コマンドを提供するCog。"""
@@ -14,8 +16,11 @@ class General(commands.Cog, name="general"):
     )
     async def help(self, context: Context) -> None:
         """全コマンドの一覧を表示する。"""
+        locale = get_locale_from_ctx(context)
         embed = discord.Embed(
-            title="Help", description="List of available commands:", color=0xBEBEFE
+            title=t("ui.help_title", locale=locale),
+            description=t("ui.help_description", locale=locale),
+            color=0xBEBEFE,
         )
         for i in self.bot.cogs:
             cog = self.bot.get_cog(i.lower())
@@ -36,9 +41,10 @@ class General(commands.Cog, name="general"):
     )
     async def ping(self, context: Context) -> None:
         """ボットの応答速度を確認する。"""
+        locale = get_locale_from_ctx(context)
         embed = discord.Embed(
-            title="🏓 Pong!",
-            description=f"The bot latency is {round(self.bot.latency * 1000)}ms.",
+            title=t("ui.ping_title", locale=locale),
+            description=t("ui.ping_latency", locale=locale, latency=round(self.bot.latency * 1000)),
             color=0xBEBEFE,
         )
         await context.send(embed=embed)

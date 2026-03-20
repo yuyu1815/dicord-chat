@@ -2,6 +2,7 @@ import discord
 
 from agents.base import MultiActionExecutionAgent
 from graph.state import AgentState
+from i18n import t
 
 
 class CategoryExecutionAgent(MultiActionExecutionAgent):
@@ -25,14 +26,14 @@ class CategoryExecutionAgent(MultiActionExecutionAgent):
         }
         handler = handlers.get(action)
         if not handler:
-            return {"success": False, "action": action, "details": f"Unknown action: {action}"}
+            return {"success": False, "action": action, "details": t("err.unknown_action", locale=self._locale, action=action)}
         return await handler(params, guild)
 
     async def _create(self, params: dict, guild: discord.Guild) -> dict:
         """カテゴリを作成する。"""
         name = params.get("name")
         if not name:
-            return {"success": False, "action": "create", "details": "Missing 'name' parameter"}
+            return {"success": False, "action": "create", "details": t("exec.missing_param", locale=self._locale, param="name")}
 
         overwrites = []
         raw_overwrites = params.get("overwrites", [])
@@ -63,7 +64,7 @@ class CategoryExecutionAgent(MultiActionExecutionAgent):
 
         try:
             category = await guild.create_category_channel(**kwargs)
-            return {"success": True, "action": "create", "details": f"Created category '{category.name}' ({category.id})"}
+            return {"success": True, "action": "create", "details": t("exec.category.created", locale=self._locale, name=category.name, id=category.id)}
         except (discord.Forbidden, discord.HTTPException) as e:
             return {"success": False, "action": "create", "details": str(e)}
 
@@ -71,10 +72,10 @@ class CategoryExecutionAgent(MultiActionExecutionAgent):
         """カテゴリを編集する。"""
         category_id = params.get("category_id")
         if not category_id:
-            return {"success": False, "action": "edit", "details": "Missing 'category_id' parameter"}
+            return {"success": False, "action": "edit", "details": t("exec.missing_param", locale=self._locale, param="category_id")}
         category = guild.get_channel(category_id)
         if not category or not isinstance(category, discord.CategoryChannel):
-            return {"success": False, "action": "edit", "details": f"Category {category_id} not found"}
+            return {"success": False, "action": "edit", "details": t("not_found.category", locale=self._locale, id=category_id)}
 
         kwargs = {}
         if "name" in params:
@@ -83,11 +84,11 @@ class CategoryExecutionAgent(MultiActionExecutionAgent):
             kwargs["position"] = params["position"]
 
         if not kwargs:
-            return {"success": False, "action": "edit", "details": "No editable parameters provided"}
+            return {"success": False, "action": "edit", "details": t("exec.no_editable_params", locale=self._locale)}
 
         try:
             await category.edit(**kwargs)
-            return {"success": True, "action": "edit", "details": f"Edited category '{category.name}'"}
+            return {"success": True, "action": "edit", "details": t("exec.category.edited", locale=self._locale, name=category.name)}
         except (discord.Forbidden, discord.HTTPException) as e:
             return {"success": False, "action": "edit", "details": str(e)}
 
@@ -95,13 +96,13 @@ class CategoryExecutionAgent(MultiActionExecutionAgent):
         """カテゴリを削除する。"""
         category_id = params.get("category_id")
         if not category_id:
-            return {"success": False, "action": "delete", "details": "Missing 'category_id' parameter"}
+            return {"success": False, "action": "delete", "details": t("exec.missing_param", locale=self._locale, param="category_id")}
         category = guild.get_channel(category_id)
         if not category or not isinstance(category, discord.CategoryChannel):
-            return {"success": False, "action": "delete", "details": f"Category {category_id} not found"}
+            return {"success": False, "action": "delete", "details": t("not_found.category", locale=self._locale, id=category_id)}
         category_name = category.name
         try:
             await category.delete()
-            return {"success": True, "action": "delete", "details": f"Deleted category '{category_name}'"}
+            return {"success": True, "action": "delete", "details": t("exec.category.deleted", locale=self._locale, name=category_name)}
         except (discord.Forbidden, discord.HTTPException) as e:
             return {"success": False, "action": "delete", "details": str(e)}

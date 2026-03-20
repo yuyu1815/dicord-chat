@@ -2,6 +2,7 @@ import discord
 
 from agents.base import MultiActionExecutionAgent
 from graph.state import AgentState
+from i18n import t
 
 
 class MessageExecutionAgent(MultiActionExecutionAgent):
@@ -37,7 +38,7 @@ class MessageExecutionAgent(MultiActionExecutionAgent):
         }
         handler = handlers.get(action)
         if not handler:
-            return {"success": False, "action": action, "details": f"Unknown action: {action}"}
+            return {"success": False, "action": action, "details": t("err.unknown_action", locale=self._locale, action=action)}
         return await handler(params, guild)
 
     async def _send(self, params: dict, guild: discord.Guild) -> dict:
@@ -45,11 +46,11 @@ class MessageExecutionAgent(MultiActionExecutionAgent):
         channel_id = params.get("channel_id")
         content = params.get("content", "")
         if not channel_id:
-            return {"success": False, "action": "send", "details": "Missing 'channel_id' parameter"}
+            return {"success": False, "action": "send", "details": t("exec.missing_param", locale=self._locale, param="channel_id")}
 
         channel = guild.get_channel(channel_id)
         if not channel or not isinstance(channel, (discord.TextChannel, discord.Thread, discord.VoiceChannel)):
-            return {"success": False, "action": "send", "details": f"Sendable channel {channel_id} not found"}
+            return {"success": False, "action": "send", "details": t("not_found.sendable_channel", locale=self._locale, id=channel_id)}
 
         embed_data = params.get("embed")
         embed = None
@@ -66,7 +67,7 @@ class MessageExecutionAgent(MultiActionExecutionAgent):
 
         try:
             message = await channel.send(content=content, embed=embed, files=files)
-            return {"success": True, "action": "send", "details": f"Sent message in #{channel.name} ({message.id})"}
+            return {"success": True, "action": "send", "details": t("exec.message.sent", locale=self._locale, channel=channel.name, id=message.id)}
         except (discord.Forbidden, discord.HTTPException) as e:
             return {"success": False, "action": "send", "details": str(e)}
 
@@ -75,16 +76,16 @@ class MessageExecutionAgent(MultiActionExecutionAgent):
         message_id = params.get("message_id")
         content = params.get("content")
         if not message_id:
-            return {"success": False, "action": "edit", "details": "Missing 'message_id' parameter"}
+            return {"success": False, "action": "edit", "details": t("exec.missing_param", locale=self._locale, param="message_id")}
         if not content:
-            return {"success": False, "action": "edit", "details": "Missing 'content' parameter"}
+            return {"success": False, "action": "edit", "details": t("exec.missing_param", locale=self._locale, param="content")}
 
         try:
             message = await self._find_message(guild, message_id)
             if not message:
-                return {"success": False, "action": "edit", "details": f"Message {message_id} not found"}
+                return {"success": False, "action": "edit", "details": t("not_found.message", locale=self._locale, id=message_id)}
             await message.edit(content=content)
-            return {"success": True, "action": "edit", "details": f"Edited message {message_id}"}
+            return {"success": True, "action": "edit", "details": t("exec.message.edited", locale=self._locale, id=message_id)}
         except (discord.Forbidden, discord.HTTPException) as e:
             return {"success": False, "action": "edit", "details": str(e)}
 
@@ -92,14 +93,14 @@ class MessageExecutionAgent(MultiActionExecutionAgent):
         """メッセージを削除する。"""
         message_id = params.get("message_id")
         if not message_id:
-            return {"success": False, "action": "delete", "details": "Missing 'message_id' parameter"}
+            return {"success": False, "action": "delete", "details": t("exec.missing_param", locale=self._locale, param="message_id")}
 
         try:
             message = await self._find_message(guild, message_id)
             if not message:
-                return {"success": False, "action": "delete", "details": f"Message {message_id} not found"}
+                return {"success": False, "action": "delete", "details": t("not_found.message", locale=self._locale, id=message_id)}
             await message.delete()
-            return {"success": True, "action": "delete", "details": f"Deleted message {message_id}"}
+            return {"success": True, "action": "delete", "details": t("exec.message.deleted", locale=self._locale, id=message_id)}
         except (discord.Forbidden, discord.HTTPException) as e:
             return {"success": False, "action": "delete", "details": str(e)}
 
@@ -108,16 +109,16 @@ class MessageExecutionAgent(MultiActionExecutionAgent):
         channel_id = params.get("channel_id")
         message_id = params.get("message_id")
         if not channel_id or not message_id:
-            return {"success": False, "action": "pin", "details": "Missing 'channel_id' or 'message_id' parameter"}
+            return {"success": False, "action": "pin", "details": t("exec.message.missing_multi_param", locale=self._locale, param1="channel_id", param2="message_id")}
 
         channel = guild.get_channel(channel_id)
         if not channel:
-            return {"success": False, "action": "pin", "details": f"Channel {channel_id} not found"}
+            return {"success": False, "action": "pin", "details": t("not_found.channel", locale=self._locale, id=channel_id)}
 
         try:
             message = await channel.fetch_message(message_id)
             await message.pin()
-            return {"success": True, "action": "pin", "details": f"Pinned message {message_id} in #{channel.name}"}
+            return {"success": True, "action": "pin", "details": t("exec.message.pinned", locale=self._locale, id=message_id, channel=channel.name)}
         except (discord.Forbidden, discord.NotFound, discord.HTTPException) as e:
             return {"success": False, "action": "pin", "details": str(e)}
 
@@ -126,16 +127,16 @@ class MessageExecutionAgent(MultiActionExecutionAgent):
         channel_id = params.get("channel_id")
         message_id = params.get("message_id")
         if not channel_id or not message_id:
-            return {"success": False, "action": "unpin", "details": "Missing 'channel_id' or 'message_id' parameter"}
+            return {"success": False, "action": "unpin", "details": t("exec.message.missing_multi_param", locale=self._locale, param1="channel_id", param2="message_id")}
 
         channel = guild.get_channel(channel_id)
         if not channel:
-            return {"success": False, "action": "unpin", "details": f"Channel {channel_id} not found"}
+            return {"success": False, "action": "unpin", "details": t("not_found.channel", locale=self._locale, id=channel_id)}
 
         try:
             message = await channel.fetch_message(message_id)
             await message.unpin()
-            return {"success": True, "action": "unpin", "details": f"Unpinned message {message_id} in #{channel.name}"}
+            return {"success": True, "action": "unpin", "details": t("exec.message.unpinned", locale=self._locale, id=message_id, channel=channel.name)}
         except (discord.Forbidden, discord.NotFound, discord.HTTPException) as e:
             return {"success": False, "action": "unpin", "details": str(e)}
 
@@ -145,16 +146,16 @@ class MessageExecutionAgent(MultiActionExecutionAgent):
         message_id = params.get("message_id")
         emoji = params.get("emoji")
         if not channel_id or not message_id or not emoji:
-            return {"success": False, "action": "add_reaction", "details": "Missing required parameters (channel_id, message_id, emoji)"}
+            return {"success": False, "action": "add_reaction", "details": t("exec.message.missing_required", locale=self._locale, params="channel_id, message_id, emoji")}
 
         channel = guild.get_channel(channel_id)
         if not channel:
-            return {"success": False, "action": "add_reaction", "details": f"Channel {channel_id} not found"}
+            return {"success": False, "action": "add_reaction", "details": t("not_found.channel", locale=self._locale, id=channel_id)}
 
         try:
             message = await channel.fetch_message(message_id)
             await message.add_reaction(emoji)
-            return {"success": True, "action": "add_reaction", "details": f"Added reaction {emoji} to message {message_id}"}
+            return {"success": True, "action": "add_reaction", "details": t("exec.message.reaction_added", locale=self._locale, emoji=emoji, id=message_id)}
         except (discord.Forbidden, discord.NotFound, discord.HTTPException) as e:
             return {"success": False, "action": "add_reaction", "details": str(e)}
 
@@ -165,11 +166,11 @@ class MessageExecutionAgent(MultiActionExecutionAgent):
         emoji = params.get("emoji")
         member_id = params.get("member_id")
         if not channel_id or not message_id or not emoji:
-            return {"success": False, "action": "remove_reaction", "details": "Missing required parameters (channel_id, message_id, emoji)"}
+            return {"success": False, "action": "remove_reaction", "details": t("exec.message.missing_required", locale=self._locale, params="channel_id, message_id, emoji")}
 
         channel = guild.get_channel(channel_id)
         if not channel:
-            return {"success": False, "action": "remove_reaction", "details": f"Channel {channel_id} not found"}
+            return {"success": False, "action": "remove_reaction", "details": t("not_found.channel", locale=self._locale, id=channel_id)}
 
         try:
             message = await channel.fetch_message(message_id)
@@ -178,10 +179,10 @@ class MessageExecutionAgent(MultiActionExecutionAgent):
                 if member:
                     await message.remove_reaction(emoji, member)
                 else:
-                    return {"success": False, "action": "remove_reaction", "details": f"Member {member_id} not found"}
+                    return {"success": False, "action": "remove_reaction", "details": t("not_found.member", locale=self._locale, id=member_id)}
             else:
                 await message.remove_reaction(emoji, guild.me)
-            return {"success": True, "action": "remove_reaction", "details": f"Removed reaction {emoji} from message {message_id}"}
+            return {"success": True, "action": "remove_reaction", "details": t("exec.message.reaction_removed", locale=self._locale, emoji=emoji, id=message_id)}
         except (discord.Forbidden, discord.NotFound, discord.HTTPException) as e:
             return {"success": False, "action": "remove_reaction", "details": str(e)}
 
@@ -190,16 +191,16 @@ class MessageExecutionAgent(MultiActionExecutionAgent):
         channel_id = params.get("channel_id")
         message_id = params.get("message_id")
         if not channel_id or not message_id:
-            return {"success": False, "action": "clear_reactions", "details": "Missing 'channel_id' or 'message_id' parameter"}
+            return {"success": False, "action": "clear_reactions", "details": t("exec.message.missing_multi_param", locale=self._locale, param1="channel_id", param2="message_id")}
 
         channel = guild.get_channel(channel_id)
         if not channel:
-            return {"success": False, "action": "clear_reactions", "details": f"Channel {channel_id} not found"}
+            return {"success": False, "action": "clear_reactions", "details": t("not_found.channel", locale=self._locale, id=channel_id)}
 
         try:
             message = await channel.fetch_message(message_id)
             await message.clear_reactions()
-            return {"success": True, "action": "clear_reactions", "details": f"Cleared all reactions from message {message_id}"}
+            return {"success": True, "action": "clear_reactions", "details": t("exec.message.reactions_cleared", locale=self._locale, id=message_id)}
         except (discord.Forbidden, discord.NotFound, discord.HTTPException) as e:
             return {"success": False, "action": "clear_reactions", "details": str(e)}
 
@@ -208,15 +209,15 @@ class MessageExecutionAgent(MultiActionExecutionAgent):
         channel_id = params.get("channel_id")
         message_ids = params.get("message_ids", [])
         if not channel_id or not message_ids:
-            return {"success": False, "action": "bulk_delete", "details": "Missing 'channel_id' or 'message_ids' parameter"}
+            return {"success": False, "action": "bulk_delete", "details": t("exec.message.missing_multi_param", locale=self._locale, param1="channel_id", param2="message_ids")}
 
         channel = guild.get_channel(channel_id)
         if not channel or not isinstance(channel, discord.TextChannel):
-            return {"success": False, "action": "bulk_delete", "details": f"Text channel {channel_id} not found"}
+            return {"success": False, "action": "bulk_delete", "details": t("not_found.text_channel", locale=self._locale, id=channel_id)}
 
         try:
             deleted = await channel.delete_messages(message_ids)
-            return {"success": True, "action": "bulk_delete", "details": f"Bulk deleted {len(message_ids)} message(s) in #{channel.name}"}
+            return {"success": True, "action": "bulk_delete", "details": t("exec.message.bulk_deleted", locale=self._locale, count=len(message_ids), channel=channel.name)}
         except (discord.Forbidden, discord.NotFound, discord.HTTPException) as e:
             return {"success": False, "action": "bulk_delete", "details": str(e)}
 

@@ -2,6 +2,7 @@ import discord
 
 from agents.base import InvestigationAgent
 from graph.state import AgentState
+from i18n import t
 
 DEFAULT_MEMBER_LIMIT = 50
 
@@ -26,11 +27,11 @@ class MemberInvestigationAgent(InvestigationAgent):
         target_user_id = state.get("user_id")
 
         if target_user_id is not None:
-            return await self._single_member(guild, target_user_id)
+            return await self._single_member(guild, target_user_id, state)
 
         return await self._member_list(guild)
 
-    async def _single_member(self, guild: discord.Guild, user_id: int) -> dict:
+    async def _single_member(self, guild: discord.Guild, user_id: int, state: AgentState) -> dict:
         """指定メンバーの詳細情報を取得する。"""
         member = guild.get_member(user_id)
 
@@ -38,9 +39,9 @@ class MemberInvestigationAgent(InvestigationAgent):
             try:
                 member = await guild.fetch_member(user_id)
             except discord.NotFound:
-                return {"error": f"member {user_id} not found in guild"}
+                return {"error": t("inv.member_not_found", locale=state.get("locale", "en"), id=user_id)}
             except discord.Forbidden:
-                return {"error": f"missing permissions to fetch member {user_id}"}
+                return {"error": t("inv.member_no_permission", locale=state.get("locale", "en"), id=user_id)}
 
         activities = member.activities or []
         activity_info = None

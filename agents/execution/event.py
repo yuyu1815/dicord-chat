@@ -4,6 +4,7 @@ import discord
 
 from agents.base import SingleActionExecutionAgent
 from graph.state import AgentState
+from i18n import t
 
 NAME = "event_execution"
 
@@ -53,12 +54,12 @@ class EventExecutionAgent(SingleActionExecutionAgent):
             kwargs["location"] = params["location"]
 
         event = await guild.create_scheduled_event(**kwargs)
-        return {"success": True, "action": "create", "details": f"Created event '{event.name}'."}
+        return {"success": True, "action": "create", "details": t("exec.event.created", locale=self._locale, name=event.name)}
 
     async def _do_edit(self, guild: discord.Guild, params: dict) -> dict:
         event = guild.get_scheduled_event(params["event_id"])
         if not event:
-            return {"success": False, "action": "edit", "details": "Event not found."}
+            return {"success": False, "action": "edit", "details": t("exec.event.not_found", locale=self._locale)}
 
         kwargs: dict = {}
         for key in ("name", "description", "status"):
@@ -70,11 +71,11 @@ class EventExecutionAgent(SingleActionExecutionAgent):
             kwargs["end_time"] = datetime.datetime.fromisoformat(params["end_time"])
 
         await event.edit(**kwargs)
-        return {"success": True, "action": "edit", "details": f"Edited event '{event.name}'."}
+        return {"success": True, "action": "edit", "details": t("exec.event.edited", locale=self._locale, name=event.name)}
 
     async def _do_delete(self, guild: discord.Guild, params: dict) -> dict:
         event = guild.get_scheduled_event(params["event_id"])
         if not event:
-            return {"success": False, "action": "delete", "details": "Event not found."}
+            return {"success": False, "action": "delete", "details": t("exec.event.not_found", locale=self._locale)}
         await event.delete()
-        return {"success": True, "action": "delete", "details": f"Deleted event '{event.name}'."}
+        return {"success": True, "action": "delete", "details": t("exec.event.deleted", locale=self._locale, name=event.name)}

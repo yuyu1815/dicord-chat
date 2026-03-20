@@ -2,6 +2,7 @@ import discord
 
 from agents.base import SingleActionExecutionAgent
 from graph.state import AgentState
+from i18n import t
 
 NAME = "invite_execution"
 
@@ -31,11 +32,11 @@ class InviteExecutionAgent(SingleActionExecutionAgent):
             elif guild.text_channels:
                 channel_id = guild.text_channels[0].id
             else:
-                return {"success": False, "action": "create", "details": "No channel available."}
+                return {"success": False, "action": "create", "details": t("exec.invite.no_channel", locale=self._locale)}
 
         channel = guild.get_channel(channel_id)
         if not channel:
-            return {"success": False, "action": "create", "details": "Channel not found."}
+            return {"success": False, "action": "create", "details": t("exec.invite.channel_not_found", locale=self._locale)}
 
         kwargs: dict = {
             "max_uses": params.get("max_uses"),
@@ -47,9 +48,9 @@ class InviteExecutionAgent(SingleActionExecutionAgent):
         kwargs = {k: v for k, v in kwargs.items() if v is not None}
 
         invite = await channel.create_invite(**kwargs)
-        return {"success": True, "action": "create", "details": f"Created invite: {invite.url}"}
+        return {"success": True, "action": "create", "details": t("exec.invite.created", locale=self._locale, url=invite.url)}
 
     async def _do_delete(self, guild: discord.Guild, params: dict) -> dict:
         invite = await guild.fetch_invite(params["invite_code"])
         await invite.delete(reason=params.get("reason"))
-        return {"success": True, "action": "delete", "details": f"Deleted invite {params['invite_code']}."}
+        return {"success": True, "action": "delete", "details": t("exec.invite.deleted", locale=self._locale, code=params['invite_code'])}

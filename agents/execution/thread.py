@@ -2,6 +2,7 @@ import discord
 
 from agents.base import MultiActionExecutionAgent
 from graph.state import AgentState
+from i18n import t
 
 
 class ThreadExecutionAgent(MultiActionExecutionAgent):
@@ -31,7 +32,7 @@ class ThreadExecutionAgent(MultiActionExecutionAgent):
         }
         handler = handlers.get(action)
         if not handler:
-            return {"success": False, "action": action, "details": f"Unknown action: {action}"}
+            return {"success": False, "action": action, "details": t("err.unknown_action", locale=self._locale, action=action)}
         return await handler(params, guild)
 
     async def _create(self, params: dict, guild: discord.Guild) -> dict:
@@ -39,13 +40,13 @@ class ThreadExecutionAgent(MultiActionExecutionAgent):
         channel_id = params.get("channel_id")
         name = params.get("name")
         if not channel_id:
-            return {"success": False, "action": "create", "details": "Missing 'channel_id' parameter"}
+            return {"success": False, "action": "create", "details": t("exec.missing_param", locale=self._locale, param="channel_id")}
         if not name:
-            return {"success": False, "action": "create", "details": "Missing 'name' parameter"}
+            return {"success": False, "action": "create", "details": t("exec.missing_param", locale=self._locale, param="name")}
 
         channel = guild.get_channel(channel_id)
         if not channel:
-            return {"success": False, "action": "create", "details": f"Channel {channel_id} not found"}
+            return {"success": False, "action": "create", "details": t("not_found.channel", locale=self._locale, id=channel_id)}
 
         thread_type = discord.ChannelType.public_thread
         type_str = params.get("type", "public").lower()
@@ -58,7 +59,7 @@ class ThreadExecutionAgent(MultiActionExecutionAgent):
 
         try:
             thread = await channel.create_thread(**kwargs)
-            return {"success": True, "action": "create", "details": f"Created thread '{thread.name}' ({thread.id})"}
+            return {"success": True, "action": "create", "details": t("exec.thread.created", locale=self._locale, name=thread.name, id=thread.id)}
         except (discord.Forbidden, discord.HTTPException) as e:
             return {"success": False, "action": "create", "details": str(e)}
 
@@ -66,13 +67,13 @@ class ThreadExecutionAgent(MultiActionExecutionAgent):
         """スレッドを編集する。"""
         thread_id = params.get("thread_id")
         if not thread_id:
-            return {"success": False, "action": "edit", "details": "Missing 'thread_id' parameter"}
+            return {"success": False, "action": "edit", "details": t("exec.missing_param", locale=self._locale, param="thread_id")}
 
         thread = guild.get_thread(thread_id)
         if not thread:
             thread = await self._find_thread(guild, thread_id)
         if not thread:
-            return {"success": False, "action": "edit", "details": f"Thread {thread_id} not found"}
+            return {"success": False, "action": "edit", "details": t("not_found.thread", locale=self._locale, id=thread_id)}
 
         kwargs: dict = {}
         if "name" in params:
@@ -85,11 +86,11 @@ class ThreadExecutionAgent(MultiActionExecutionAgent):
             kwargs["slowmode_delay"] = params["slowmode"]
 
         if not kwargs:
-            return {"success": False, "action": "edit", "details": "No editable parameters provided"}
+            return {"success": False, "action": "edit", "details": t("exec.no_editable_params", locale=self._locale)}
 
         try:
             await thread.edit(**kwargs)
-            return {"success": True, "action": "edit", "details": f"Edited thread '{thread.name}'"}
+            return {"success": True, "action": "edit", "details": t("exec.thread.edited", locale=self._locale, name=thread.name)}
         except (discord.Forbidden, discord.HTTPException) as e:
             return {"success": False, "action": "edit", "details": str(e)}
 
@@ -97,18 +98,18 @@ class ThreadExecutionAgent(MultiActionExecutionAgent):
         """スレッドを削除する。"""
         thread_id = params.get("thread_id")
         if not thread_id:
-            return {"success": False, "action": "delete", "details": "Missing 'thread_id' parameter"}
+            return {"success": False, "action": "delete", "details": t("exec.missing_param", locale=self._locale, param="thread_id")}
 
         thread = guild.get_thread(thread_id)
         if not thread:
             thread = await self._find_thread(guild, thread_id)
         if not thread:
-            return {"success": False, "action": "delete", "details": f"Thread {thread_id} not found"}
+            return {"success": False, "action": "delete", "details": t("not_found.thread", locale=self._locale, id=thread_id)}
 
         thread_name = thread.name
         try:
             await thread.delete()
-            return {"success": True, "action": "delete", "details": f"Deleted thread '{thread_name}'"}
+            return {"success": True, "action": "delete", "details": t("exec.thread.deleted", locale=self._locale, name=thread_name)}
         except (discord.Forbidden, discord.HTTPException) as e:
             return {"success": False, "action": "delete", "details": str(e)}
 
@@ -117,23 +118,23 @@ class ThreadExecutionAgent(MultiActionExecutionAgent):
         thread_id = params.get("thread_id")
         member_id = params.get("member_id")
         if not thread_id:
-            return {"success": False, "action": "add_member", "details": "Missing 'thread_id' parameter"}
+            return {"success": False, "action": "add_member", "details": t("exec.missing_param", locale=self._locale, param="thread_id")}
         if not member_id:
-            return {"success": False, "action": "add_member", "details": "Missing 'member_id' parameter"}
+            return {"success": False, "action": "add_member", "details": t("exec.missing_param", locale=self._locale, param="member_id")}
 
         thread = guild.get_thread(thread_id)
         if not thread:
             thread = await self._find_thread(guild, thread_id)
         if not thread:
-            return {"success": False, "action": "add_member", "details": f"Thread {thread_id} not found"}
+            return {"success": False, "action": "add_member", "details": t("not_found.thread", locale=self._locale, id=thread_id)}
 
         member = guild.get_member(member_id)
         if not member:
-            return {"success": False, "action": "add_member", "details": f"Member {member_id} not found"}
+            return {"success": False, "action": "add_member", "details": t("not_found.member", locale=self._locale, id=member_id)}
 
         try:
             await thread.add_member(member)
-            return {"success": True, "action": "add_member", "details": f"Added {member.display_name} to thread '{thread.name}'"}
+            return {"success": True, "action": "add_member", "details": t("exec.thread.member_added", locale=self._locale, member=member.display_name, name=thread.name)}
         except (discord.Forbidden, discord.HTTPException) as e:
             return {"success": False, "action": "add_member", "details": str(e)}
 
@@ -141,17 +142,17 @@ class ThreadExecutionAgent(MultiActionExecutionAgent):
         """ボットをスレッドに参加させる。"""
         thread_id = params.get("thread_id")
         if not thread_id:
-            return {"success": False, "action": "join", "details": "Missing 'thread_id' parameter"}
+            return {"success": False, "action": "join", "details": t("exec.missing_param", locale=self._locale, param="thread_id")}
 
         thread = guild.get_thread(thread_id)
         if not thread:
             thread = await self._find_thread(guild, thread_id)
         if not thread:
-            return {"success": False, "action": "join", "details": f"Thread {thread_id} not found"}
+            return {"success": False, "action": "join", "details": t("not_found.thread", locale=self._locale, id=thread_id)}
 
         try:
             await thread.join()
-            return {"success": True, "action": "join", "details": f"Joined thread '{thread.name}'"}
+            return {"success": True, "action": "join", "details": t("exec.thread.joined", locale=self._locale, name=thread.name)}
         except (discord.Forbidden, discord.HTTPException) as e:
             return {"success": False, "action": "join", "details": str(e)}
 
@@ -159,17 +160,17 @@ class ThreadExecutionAgent(MultiActionExecutionAgent):
         """ボットをスレッドから退出させる。"""
         thread_id = params.get("thread_id")
         if not thread_id:
-            return {"success": False, "action": "leave", "details": "Missing 'thread_id' parameter"}
+            return {"success": False, "action": "leave", "details": t("exec.missing_param", locale=self._locale, param="thread_id")}
 
         thread = guild.get_thread(thread_id)
         if not thread:
             thread = await self._find_thread(guild, thread_id)
         if not thread:
-            return {"success": False, "action": "leave", "details": f"Thread {thread_id} not found"}
+            return {"success": False, "action": "leave", "details": t("not_found.thread", locale=self._locale, id=thread_id)}
 
         try:
             await thread.leave()
-            return {"success": True, "action": "leave", "details": f"Left thread '{thread.name}'"}
+            return {"success": True, "action": "leave", "details": t("exec.thread.left", locale=self._locale, name=thread.name)}
         except (discord.Forbidden, discord.HTTPException) as e:
             return {"success": False, "action": "leave", "details": str(e)}
 

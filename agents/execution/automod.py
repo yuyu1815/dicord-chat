@@ -4,6 +4,7 @@ import discord
 
 from agents.base import SingleActionExecutionAgent
 from graph.state import AgentState
+from i18n import t
 
 NAME = "automod_execution"
 
@@ -90,7 +91,7 @@ class AutoModExecutionAgent(SingleActionExecutionAgent):
             kwargs["exempt_channels"] = params["exempt_channels"]
 
         rule = await guild.create_automod_rule(**kwargs)
-        return {"success": True, "action": "create_rule", "details": f"Created AutoMod rule '{rule.name}'."}
+        return {"success": True, "action": "create_rule", "details": t("exec.automod.rule_created", locale=self._locale, name=rule.name)}
 
     async def _do_edit_rule(self, guild: discord.Guild, params: dict) -> dict:
         kwargs: dict = {}
@@ -104,8 +105,8 @@ class AutoModExecutionAgent(SingleActionExecutionAgent):
             kwargs["enabled"] = params["enabled"]
 
         rule = await guild.edit_automod_rule(params["rule_id"], **kwargs)
-        return {"success": True, "action": "edit_rule", "details": f"Edited AutoMod rule '{rule.name}'."}
+        return {"success": True, "action": "edit_rule", "details": t("exec.automod.rule_edited", locale=self._locale, name=rule.name)}
 
     async def _do_delete_rule(self, guild: discord.Guild, params: dict) -> dict:
         await guild.delete_automod_rule(params["rule_id"])
-        return {"success": True, "action": "delete_rule", "details": f"Deleted AutoMod rule {params['rule_id']}."}
+        return {"success": True, "action": "delete_rule", "details": t("exec.automod.rule_deleted", locale=self._locale, id=params['rule_id'])}

@@ -12,6 +12,9 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("discord_bot")
 
+
+LOGS_DIR = Path(__file__).resolve().parent / "logs"
+
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
@@ -44,6 +47,10 @@ class DiscordBot(commands.Bot):
     async def setup_hook(self) -> None:
         """ボット起動時の初期化処理。データベース・LLM・エージェント・Cogを読み込む。"""
         await self._init_database()
+
+        from i18n import DiscordCommandTranslator
+
+        await self.tree.set_translator(DiscordCommandTranslator())
 
         from graph.llm import create_llm
         from agents.main_agent import MainAgent
@@ -94,6 +101,17 @@ class DiscordBot(commands.Bot):
                 await db.execute(
                     "ALTER TABLE approvals ADD COLUMN todos_hash TEXT",
                 )
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS conversation_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    guild_id INTEGER NOT NULL,
+                    session_id TEXT NOT NULL,
+                    request TEXT NOT NULL,
+                    response TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                )
+            """)
             await db.commit()
         self.logger.info("Database initialized: %s", db_path)
 
