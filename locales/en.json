@@ -220,5 +220,8 @@
   "inv.member_no_permission": "missing permissions to fetch member {id}",
   "inv.channel_required": "channel_id is required in state",
   "inv.channel_not_found": "channel {id} not found in guild",
-  "inv.channel_not_messageable": "channel {id} is not messageable"
+  "inv.channel_not_messageable": "channel {id} is not messageable",
+  "inv.search_no_query": "No search query provided",
+
+  "ratelimit.channel_edit_name_topic": "Channel name/topic can only be changed 2 times per 10 minutes. Please wait before trying again."
 }

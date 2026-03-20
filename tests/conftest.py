@@ -5,6 +5,16 @@ import datetime
 
 import discord
 
+from agents.ratelimit import _history
+
+
+@pytest.fixture(autouse=True)
+def reset_ratelimit_history():
+    """Reset channel name/topic edit rate limit history between tests."""
+    _history.clear()
+    yield
+    _history.clear()
+
 
 @pytest.fixture
 def mock_guild():

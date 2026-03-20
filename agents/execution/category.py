@@ -1,11 +1,15 @@
 import discord
 
 from agents.base import MultiActionExecutionAgent
+from agents.ratelimit import check_rate_limit, record_edit
 from i18n import t
 
 
 class CategoryExecutionAgent(MultiActionExecutionAgent):
     """カテゴリ（チャンネルグループ）の操作を行うエージェント。"""
+
+    # edit(name) は2回/10分制限だがratelimitモジュールでチェックする
+    ACTION_COOLDOWN: float = 1.0
 
     ACTION_PERMISSIONS: dict[str, list[str]] = {
         "create": ["manage_channels"],
@@ -77,16 +81,25 @@ class CategoryExecutionAgent(MultiActionExecutionAgent):
             return {"success": False, "action": "edit", "details": t("not_found.category", locale=self._locale, id=category_id)}
 
         kwargs = {}
+        touches_name = False
         if "name" in params:
             kwargs["name"] = params["name"]
+            touches_name = True
         if "position" in params:
             kwargs["position"] = params["position"]
 
         if not kwargs:
             return {"success": False, "action": "edit", "details": t("exec.no_editable_params", locale=self._locale)}
 
+        if touches_name:
+            rate_error = check_rate_limit(self._locale)
+            if rate_error:
+                return rate_error
+
         try:
             await category.edit(**kwargs)
+            if touches_name:
+                record_edit()
             return {"success": True, "action": "edit", "details": t("exec.category.edited", locale=self._locale, name=category.name)}
         except (discord.Forbidden, discord.HTTPException) as e:
             return {"success": False, "action": "edit", "details": str(e)}

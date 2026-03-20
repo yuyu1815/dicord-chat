@@ -9,6 +9,9 @@ NAME = "emoji_execution"
 
 
 class EmojiExecutionAgent(SingleActionExecutionAgent):
+    # Emoji操作は通常と異なるギルド単位の厳しいレート制限がある
+    ACTION_COOLDOWN: float = 15.0
+
     ACTION_HANDLERS: dict[str, str] = {
         "create": "Create emoji",
         "edit": "Edit emoji",

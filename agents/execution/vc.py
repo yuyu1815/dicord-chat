@@ -1,12 +1,16 @@
 import discord
 
 from agents.base import MultiActionExecutionAgent
+from agents.ratelimit import check_rate_limit, record_edit
 from graph.state import AgentState
 from i18n import t
 
 
 class VoiceChannelExecutionAgent(MultiActionExecutionAgent):
     """ボイスチャンネルの操作（メンバー移動・ミュート・切断・チャンネル編集）を行うエージェント。"""
+
+    # edit_channel(name) は2回/10分制限だがratelimitモジュールでチェックする
+    ACTION_COOLDOWN: float = 1.0
 
     ACTION_PERMISSIONS: dict[str, list[str]] = {
         "create": ["manage_channels"],
@@ -161,8 +165,10 @@ class VoiceChannelExecutionAgent(MultiActionExecutionAgent):
             return {"success": False, "action": "edit_channel", "details": t("not_found.voice_channel", locale=self._locale, id=channel_id)}
 
         kwargs: dict = {}
+        touches_name = False
         if "name" in params:
             kwargs["name"] = params["name"]
+            touches_name = True
         if "bitrate" in params:
             kwargs["bitrate"] = params["bitrate"]
         if "user_limit" in params:
@@ -171,5 +177,12 @@ class VoiceChannelExecutionAgent(MultiActionExecutionAgent):
         if not kwargs:
             return {"success": False, "action": "edit_channel", "details": t("exec.no_editable_params", locale=self._locale)}
 
+        if touches_name:
+            rate_error = check_rate_limit(self._locale)
+            if rate_error:
+                return rate_error
+
         await channel.edit(**kwargs)
+        if touches_name:
+            record_edit()
         return {"success": True, "action": "edit_channel", "details": t("exec.vc.edited", locale=self._locale, name=channel.name)}

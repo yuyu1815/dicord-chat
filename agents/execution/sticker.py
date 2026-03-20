@@ -9,6 +9,9 @@ from i18n import t
 NAME = "sticker_execution"
 
 class StickerExecutionAgent(SingleActionExecutionAgent):
+    # Sticker操作はEmojiと同様にギルド単位のレート制限がある
+    ACTION_COOLDOWN: float = 15.0
+
     ACTION_HANDLERS: dict[str, str] = {
         "create": "Create sticker",
         "edit": "Edit sticker",

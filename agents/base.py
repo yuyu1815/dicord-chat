@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+import asyncio
 import logging
 from typing import Any
 
@@ -85,6 +86,7 @@ class ExecutionAgent(BaseAgent):
 
     ACTION_PERMISSIONS: dict[str, list[str]] = {}
     single_action: bool = False
+    ACTION_COOLDOWN: float = 1.0  # 複数アクション実行時の1アクション間のクールダウン(秒)
 
     async def run(self, state: AgentState, guild: Any) -> AgentState:
         if not state.get("approved"):
@@ -237,7 +239,12 @@ class MultiActionExecutionAgent(ExecutionAgent):
             return {"success": False, "action": "none", "details": t("err.no_matching_action", locale=self._locale)}
 
         results = []
-        for todo in my_todos:
+        for i, todo in enumerate(my_todos):
+            if i > 0 and self.ACTION_COOLDOWN > 0:
+                logger.debug(
+                    "%s: cooldown %.1fs before next action", self.name, self.ACTION_COOLDOWN,
+                )
+                await asyncio.sleep(self.ACTION_COOLDOWN)
             action = todo.get("action", "")
             params = todo.get("params", {})
             await log_agent_call(self.name, "execution.action.start", state, guild=guild, action=action)

@@ -220,5 +220,8 @@
   "inv.member_no_permission": "メンバー {id} の取得に必要な権限がありません",
   "inv.channel_required": "stateにchannel_idが必要です",
   "inv.channel_not_found": "チャンネル {id} がサーバーに見つかりません",
-  "inv.channel_not_messageable": "チャンネル {id} はメッセージ送信不可です"
+  "inv.channel_not_messageable": "チャンネル {id} はメッセージ送信不可です",
+  "inv.search_no_query": "検索クエリが指定されていません",
+
+  "ratelimit.channel_edit_name_topic": "チャンネル名/トピックは10分間に2回まで変更可能です。しばらくお待ちください。"
 }

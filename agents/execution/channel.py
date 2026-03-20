@@ -1,11 +1,15 @@
 import discord
 
 from agents.base import MultiActionExecutionAgent
+from agents.ratelimit import check_rate_limit, record_edit
 from i18n import t
 
 
 class ChannelExecutionAgent(MultiActionExecutionAgent):
     """テキスト・ボイスチャンネルの操作を行うエージェント。"""
+
+    # create/delete/reorder/clone は標準的
+    ACTION_COOLDOWN: float = 1.0
 
     ACTION_PERMISSIONS: dict[str, list[str]] = {
         "create": ["manage_channels"],
@@ -90,10 +94,13 @@ class ChannelExecutionAgent(MultiActionExecutionAgent):
             return {"success": False, "action": "edit", "details": t("not_found.channel", locale=self._locale, id=channel_id)}
 
         kwargs = {}
+        touches_name_topic = False
         if "name" in params:
             kwargs["name"] = params["name"]
+            touches_name_topic = True
         if "topic" in params:
             kwargs["topic"] = params["topic"]
+            touches_name_topic = True
         if "nsfw" in params:
             kwargs["nsfw"] = params["nsfw"]
         if "slowmode" in params:
@@ -102,8 +109,16 @@ class ChannelExecutionAgent(MultiActionExecutionAgent):
         if not kwargs:
             return {"success": False, "action": "edit", "details": t("exec.no_editable_params", locale=self._locale)}
 
+        # 名前/トピック変更は2回/10分のサブレート制限
+        if touches_name_topic:
+            rate_error = check_rate_limit(self._locale)
+            if rate_error:
+                return rate_error
+
         try:
             await channel.edit(**kwargs)
+            if touches_name_topic:
+                record_edit()
             return {"success": True, "action": "edit", "details": t("exec.channel.edited", locale=self._locale, name=channel.name)}
         except (discord.Forbidden, discord.HTTPException) as e:
             return {"success": False, "action": "edit", "details": str(e)}
