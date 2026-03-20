@@ -92,14 +92,14 @@ class CategoryExecutionAgent(MultiActionExecutionAgent):
             return {"success": False, "action": "edit", "details": t("exec.no_editable_params", locale=self._locale)}
 
         if touches_name:
-            rate_error = check_rate_limit(self._locale)
+            rate_error = check_rate_limit(category_id, self._locale)
             if rate_error:
                 return rate_error
 
         try:
             await category.edit(**kwargs)
             if touches_name:
-                record_edit()
+                record_edit(category_id)
             return {"success": True, "action": "edit", "details": t("exec.category.edited", locale=self._locale, name=category.name)}
         except (discord.Forbidden, discord.HTTPException) as e:
             return {"success": False, "action": "edit", "details": str(e)}

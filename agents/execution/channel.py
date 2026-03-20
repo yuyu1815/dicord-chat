@@ -109,16 +109,16 @@ class ChannelExecutionAgent(MultiActionExecutionAgent):
         if not kwargs:
             return {"success": False, "action": "edit", "details": t("exec.no_editable_params", locale=self._locale)}
 
-        # 名前/トピック変更は2回/10分のサブレート制限
+        # 名前/トピック変更は2回/10分のサブレート制限（チャンネルごと）
         if touches_name_topic:
-            rate_error = check_rate_limit(self._locale)
+            rate_error = check_rate_limit(channel_id, self._locale)
             if rate_error:
                 return rate_error
 
         try:
             await channel.edit(**kwargs)
             if touches_name_topic:
-                record_edit()
+                record_edit(channel_id)
             return {"success": True, "action": "edit", "details": t("exec.channel.edited", locale=self._locale, name=channel.name)}
         except (discord.Forbidden, discord.HTTPException) as e:
             return {"success": False, "action": "edit", "details": str(e)}

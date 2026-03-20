@@ -178,11 +178,11 @@ class VoiceChannelExecutionAgent(MultiActionExecutionAgent):
             return {"success": False, "action": "edit_channel", "details": t("exec.no_editable_params", locale=self._locale)}
 
         if touches_name:
-            rate_error = check_rate_limit(self._locale)
+            rate_error = check_rate_limit(channel_id, self._locale)
             if rate_error:
                 return rate_error
 
         await channel.edit(**kwargs)
         if touches_name:
-            record_edit()
+            record_edit(channel_id)
         return {"success": True, "action": "edit_channel", "details": t("exec.vc.edited", locale=self._locale, name=channel.name)}
