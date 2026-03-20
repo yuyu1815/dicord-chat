@@ -48,12 +48,11 @@ class DiscordBot(commands.Bot):
         """ボット起動時の初期化処理。データベース・LLM・エージェント・Cogを読み込む。"""
         await self._init_database()
 
+        from agents.main_agent import MainAgent
+        from graph.llm import create_llm
         from i18n import DiscordCommandTranslator
 
         await self.tree.set_translator(DiscordCommandTranslator())
-
-        from graph.llm import create_llm
-        from agents.main_agent import MainAgent
 
         try:
             llm = create_llm(

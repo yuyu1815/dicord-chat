@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta, timezone
+
 import discord
 
 from agents.base import MultiActionExecutionAgent
@@ -107,7 +109,6 @@ class MemberExecutionAgent(MultiActionExecutionAgent):
         if not member:
             return {"success": False, "action": "timeout", "details": t("not_found.member", locale=self._locale, id=member_id)}
 
-        from datetime import datetime, timedelta, timezone
         until = datetime.now(timezone.utc) + timedelta(minutes=duration_minutes)
 
         try:

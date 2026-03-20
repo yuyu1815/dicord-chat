@@ -1,9 +1,11 @@
 import logging
+from collections import Counter
 from typing import Any
 
 from langgraph.graph import END, StateGraph
 
 from agents.registry import get_single_action_agents, load_agent_module
+from database.conversation import load_session_detail
 from graph.state import (
     AgentState,
     PLANNER_STATUS_DONE_NO_EXECUTION,
@@ -175,8 +177,6 @@ def build_pre_approval_workflow() -> StateGraph:
 
     async def resolve_history(state: AgentState) -> dict[str, Any]:
         """要求された過去セッションのJSONL詳細ログを読み込む。"""
-        from database.conversation import load_session_detail
-
         decision = state.get("planner_decision", {})
         session_id = decision.get("session_id", "")
         guild_id = state.get("guild_id", 0)
@@ -294,9 +294,6 @@ def build_pre_approval_workflow() -> StateGraph:
             }
 
         # Fail closed: single-action agents can only process one todo.
-        # If the planner proposed multiple todos for any of them, we must
-        # reject the plan rather than silently dropping actions.
-        from collections import Counter
         agent_counts = Counter(t.get("agent", "") for t in execution_drafts)
         multi = {
             name for name, count in agent_counts.items()

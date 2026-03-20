@@ -8,6 +8,7 @@ from discord.ext import commands
 
 from agents.base import BaseAgent, ExecutionAgent, InvestigationAgent
 from agents.registry import load_agent_module
+from database.conversation import load_conversation_history, save_conversation_turn
 from formatters.response import (
     compute_todos_hash,
     format_execution_candidates,
@@ -16,6 +17,7 @@ from formatters.response import (
     split_message,
 )
 from graph.state import AgentState
+from graph.workflow import build_post_approval_workflow, build_pre_approval_workflow
 from i18n import t, get_locale_from_ctx
 
 logger = logging.getLogger("discord_bot")
@@ -44,7 +46,6 @@ async def _save_history(
     request: str,
     response: str,
 ) -> None:
-    from database.conversation import save_conversation_turn
     try:
         await save_conversation_turn(
             db_path,
@@ -153,8 +154,6 @@ class ApprovalView(discord.ui.View):
 
     async def _execute_approved(self) -> None:
         """承認後にpost-approvalワークフローを再開し、結果をチャンネルに送信する。"""
-        from graph.workflow import build_post_approval_workflow
-
         guild = self.bot.get_guild(self.state["guild_id"])
         if not guild:
             logger.error("Guild %s not found", self.state["guild_id"])
@@ -198,8 +197,6 @@ class ApprovalView(discord.ui.View):
 
     async def _handle_rejected(self) -> None:
         """拒否時に終了メッセージをチャンネルに送信する。"""
-        from graph.workflow import build_post_approval_workflow
-
         guild = self.bot.get_guild(self.state["guild_id"])
         if not guild:
             return
@@ -253,8 +250,6 @@ class AgentCog(commands.Cog):
 
         db_path = _get_db_path(self.bot)
 
-        # Load conversation history
-        from database.conversation import load_conversation_history
         try:
             history = await load_conversation_history(
                 db_path, user_id=ctx.author.id, guild_id=ctx.guild.id,
@@ -273,8 +268,6 @@ class AgentCog(commands.Cog):
             "conversation_history": history,
             "bot": self.bot,
         }
-
-        from graph.workflow import build_pre_approval_workflow
 
         pre_workflow = build_pre_approval_workflow()
         app = pre_workflow.compile()
