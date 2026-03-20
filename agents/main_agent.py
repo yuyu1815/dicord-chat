@@ -13,6 +13,7 @@ from agents.registry import (
     INVESTIGATION_TARGETS,
     get_execution_agent_names,
 )
+from agents.prompts import EXECUTION_PARAMS_GUIDE
 from graph.state import (
     VALID_PLANNER_STATUSES,
     AgentState,
@@ -148,6 +149,7 @@ class MainAgent:
         prompt = SYSTEM_PROMPT.format(
             investigation_targets=targets_str,
             execution_agents=agents_str,
+            params_guide=EXECUTION_PARAMS_GUIDE,
         )
 
         messages = [
@@ -250,6 +252,7 @@ class MainAgent:
             investigation_targets=targets_str,
             execution_agents=agents_str,
             history_section=history_section,
+            params_guide=EXECUTION_PARAMS_GUIDE,
         )
 
         messages = [
