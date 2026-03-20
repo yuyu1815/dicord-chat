@@ -56,6 +56,7 @@ async def log_ai_exchange(
     response_text: str | None = None,
     parsed: dict[str, Any] | None = None,
     error: str | None = None,
+    usage: dict[str, Any] | None = None,
 ) -> None:
     """LLM送受信内容をJSONLで保存する（非同期）。"""
     record: dict[str, Any] = {
@@ -78,6 +79,8 @@ async def log_ai_exchange(
         record["parsed"] = parsed
     if error is not None:
         record["error"] = error
+    if usage is not None:
+        record["usage"] = usage
     await append_ai_jsonl(record, state)
 
 

@@ -33,6 +33,7 @@ def create_llm(
                 model=model or "gpt-4o",
                 api_key=api_key,
                 base_url=base_url,
+                stream_usage=True,
             )
         case "anthropic":
             try:
@@ -54,6 +55,7 @@ def create_llm(
                 model=model or "default",
                 api_key=api_key or "not-needed",
                 base_url=base_url,
+                stream_usage=True,
             )
         case _:
             raise ValueError(f"Unknown provider: {provider}. Use openai, anthropic, or custom.")

@@ -27,6 +27,44 @@ from graph.state import (
 logger = logging.getLogger("discord_bot")
 
 
+def _extract_usage(response: Any) -> dict[str, int]:
+    """LLMレスポンスからトークン使用量を抽出する。
+
+    Args:
+        response: LangChain AIMessage。
+
+    Returns:
+        input_tokens, output_tokens, cache_read, cache_creation, reasoning を含む辞書。
+    """
+    usage: dict[str, int] = {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_read": 0,
+        "cache_creation": 0,
+        "reasoning": 0,
+    }
+    meta = getattr(response, "usage_metadata", None)
+    if isinstance(meta, dict):
+        usage["input_tokens"] = meta.get("input_tokens", 0) or 0
+        usage["output_tokens"] = meta.get("output_tokens", 0) or 0
+        details = meta.get("input_token_details") or {}
+        if isinstance(details, dict):
+            usage["cache_read"] = details.get("cache_read", 0) or 0
+            usage["cache_creation"] = details.get("cache_creation", 0) or 0
+        out_details = meta.get("output_token_details") or {}
+        if isinstance(out_details, dict):
+            usage["reasoning"] = out_details.get("reasoning", 0) or 0
+
+    # Anthropic thinking tokens (not mapped by LangChain into usage_metadata)
+    resp_meta = getattr(response, "response_metadata", None)
+    if isinstance(resp_meta, dict):
+        raw_usage = resp_meta.get("usage") or {}
+        if isinstance(raw_usage, dict) and "thinking_tokens" in raw_usage:
+            usage["reasoning"] = raw_usage["thinking_tokens"]
+
+    return usage
+
+
 def _extract_first_json_object(text: str) -> str:
     """文字列中から最初のトップレベルJSONオブジェクトを抽出する。"""
     start = text.find("{")
@@ -125,6 +163,7 @@ class MainAgent:
                 messages,
                 response_text=response.content,
                 parsed=parsed,
+                usage=_extract_usage(response),
             )
             return parsed
         except Exception as e:
@@ -243,6 +282,7 @@ class MainAgent:
                 messages,
                 response_text=response.content,
                 parsed=validated,
+                usage=_extract_usage(response),
             )
             return validated
         except Exception as e:
