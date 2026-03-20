@@ -81,6 +81,7 @@ class ApprovalView(discord.ui.View):
         await self._save_approval(False)
         await interaction.response.send_message("Operation cancelled.", ephemeral=True)
         self.stop()
+        asyncio.create_task(self._handle_rejected())
 
     async def _save_approval(self, approved: bool) -> None:
         """承認結果をデータベースに保存する。"""
@@ -93,21 +94,50 @@ class ApprovalView(discord.ui.View):
             await db.commit()
 
     async def _execute_approved(self) -> None:
-        """承認後に実行エージェントを実行し、結果をチャンネルに送信する。"""
+        """承認後にpost-approvalワークフローを再開し、結果をチャンネルに送信する。"""
+        from graph.workflow import build_post_approval_workflow
+
         guild = self.bot.get_guild(self.state["guild_id"])
         if not guild:
             logger.error("Guild %s not found", self.state["guild_id"])
             return
 
         self.state["approved"] = True
-        results = await _run_agents(self.state, guild, execution_only=True)
+        self.state["approval_status"] = "approved"
+
+        post_workflow = build_post_approval_workflow()
+        app = post_workflow.compile()
+        final_state = await app.ainvoke(self.state)
 
         channel = guild.get_channel(self.state["channel_id"])
         if not channel or not isinstance(channel, discord.TextChannel):
             return
 
-        formatted = _format_results(results, title="Execution Results")
+        response = final_state.get("final_response", "Done.")
+        formatted = _format_final_response(final_state)
         for chunk in _split_message(formatted, max_length=1900):
+            await channel.send(chunk)
+
+    async def _handle_rejected(self) -> None:
+        """拒否時に終了メッセージをチャンネルに送信する。"""
+        from graph.workflow import build_post_approval_workflow
+
+        guild = self.bot.get_guild(self.state["guild_id"])
+        if not guild:
+            return
+
+        self.state["approval_status"] = "rejected"
+
+        post_workflow = build_post_approval_workflow()
+        app = post_workflow.compile()
+        final_state = await app.ainvoke(self.state)
+
+        channel = guild.get_channel(self.state["channel_id"])
+        if not channel or not isinstance(channel, discord.TextChannel):
+            return
+
+        final_response = final_state.get("final_response", "Request cancelled.")
+        for chunk in _split_message(final_response, max_length=1900):
             await channel.send(chunk)
 
 
@@ -120,7 +150,7 @@ class AgentCog(commands.Cog):
 
     @commands.hybrid_command(name="manage", description="Manage Discord server via AI agents")
     async def manage(self, ctx: commands.Context, *, request: str) -> None:
-        """エントリーポイント。リクエストを解析し、調査→実行候補を提示する。"""
+        """エントリーポイント。ワークフローを実行し、調査結果・承認・実行を行う。"""
         if not ctx.guild:
             await ctx.send("This command requires a server context.")
             return
@@ -136,27 +166,31 @@ class AgentCog(commands.Cog):
             "channel_id": ctx.channel.id,
             "user_id": ctx.author.id,
             "user_permissions": user_permissions,
-            "todos": [],
-            "investigation_results": {},
             "approval_id": str(uuid.uuid4()),
-            "approved": False,
-            "execution_results": {},
-            "final_response": "",
-            "error": None,
         }
 
-        parsed = await self.main_agent.parse_request(state)
-        state["todos"] = self.main_agent.build_todos(parsed)
+        from graph.workflow import build_pre_approval_workflow
 
-        if not state["todos"]:
-            await ctx.send("Could not determine any actions for that request.")
+        pre_workflow = build_pre_approval_workflow()
+        app = pre_workflow.compile()
+        final_state = await app.ainvoke(state)
+
+        plan_status = final_state.get("plan_status", "")
+        approval_required = final_state.get("approval_required", False)
+        error = final_state.get("error")
+
+        if plan_status == "error":
+            error_msg = error or "An error occurred during planning."
+            for chunk in _split_message(f"**Error:** {error_msg}", max_length=1900):
+                await ctx.send(chunk)
             return
 
-        investigation_results = await _run_agents(state, ctx.guild, investigation_only=True)
-        state["investigation_results"] = investigation_results
-
-        investigation_text = _format_results(investigation_results, title="Investigation Results")
-        execution_text = _format_execution_candidates(state["todos"])
+        # レスポンスを構築
+        investigation_text = _format_results(
+            final_state.get("investigation_results", {}),
+            title="Investigation Results",
+        )
+        execution_text = _format_execution_candidates(final_state.get("todos", []))
 
         response_parts = [f"**Request:** {request}\n"]
         if investigation_text:
@@ -168,14 +202,36 @@ class AgentCog(commands.Cog):
 
         full_response = "\n".join(response_parts)
 
-        execution_todos = [t for t in state["todos"] if "investigation" not in t.get("agent", "")]
-        if execution_todos:
-            view = ApprovalView(self.bot, state["approval_id"], state)
-            for chunk in _split_message(full_response, max_length=1900):
-                await ctx.send(chunk, view=view if chunk == _split_message(full_response, max_length=1900)[-1] else None)
+        if approval_required:
+            view = ApprovalView(self.bot, final_state["approval_id"], final_state)
+            chunks = _split_message(full_response, max_length=1900)
+            for chunk in chunks:
+                await ctx.send(chunk, view=view if chunk == chunks[-1] else None)
         else:
             for chunk in _split_message(full_response, max_length=1900):
                 await ctx.send(chunk)
+
+
+def _format_final_response(state: AgentState) -> str:
+    """最終状態からDiscord向けのレスポンスを構築する。
+
+    Args:
+        state: ワークフローの最終状態。
+
+    Returns:
+        フォーマットされた文字列。
+    """
+    parts = []
+
+    execution_results = state.get("execution_results", {})
+    if execution_results:
+        parts.append(_format_results(execution_results, title="Execution Results"))
+
+    final_response = state.get("final_response", "")
+    if final_response and final_response != "Done.":
+        parts.append(final_response)
+
+    return "\n".join(parts) if parts else "Done."
 
 
 async def _run_agents(
