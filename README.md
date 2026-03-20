@@ -1,141 +1,185 @@
-# Python Discord Bot Template
+# AI Discord Server Manager
 
-<p align="center">
-  <a href="https://discord.gg/xj6y5ZaTMr"><img src="https://img.shields.io/discord/1358456011316396295?logo=discord"></a>
-  <a href="https://github.com/kkrypt0nn/Python-Discord-Bot-Template/releases"><img src="https://img.shields.io/github/v/release/kkrypt0nn/Python-Discord-Bot-Template"></a>
-  <a href="https://github.com/kkrypt0nn/Python-Discord-Bot-Template/commits/main"><img src="https://img.shields.io/github/last-commit/kkrypt0nn/Python-Discord-Bot-Template"></a>
-  <a href="https://github.com/kkrypt0nn/Python-Discord-Bot-Template/blob/main/LICENSE.md"><img src="https://img.shields.io/github/license/kkrypt0nn/Python-Discord-Bot-Template"></a>
-  <a href="https://github.com/kkrypt0nn/Python-Discord-Bot-Template"><img src="https://img.shields.io/github/languages/code-size/kkrypt0nn/Python-Discord-Bot-Template"></a>
-  <a href="https://conventionalcommits.org/en/v1.0.0/"><img src="https://img.shields.io/badge/Conventional%20Commits-1.0.0-%23FE5196?logo=conventionalcommits&logoColor=white"></a>
-  <a href="https://github.com/psf/black"><img src="https://img.shields.io/badge/code%20style-black-000000.svg"></a>
-</p>
+LLM + LangGraph で動く Discord サーバー管理ボット。自然言語でリクエストを投げると、ボットが調査・計画・承認・実行のフローで自動的にサーバー管理タスクをこなす。
 
-> [!NOTE]
-> This project is in a **feature-freeze mode**, please read more about it [here](https://github.com/kkrypt0nn/Python-Discord-Bot-Template/issues/112). It can be summed up in a few bullet points:
-> 
-> * The project **will** receive bug fixes
-> * The project **will** be updated to make sure it works with the **latest** discord.py version
-> * The project **will not** receive any new features, **unless one of the following applies**:
->   * A new feature is added to Discord and it would be beneficial to have it in the template
->   * A feature got a breaking change, this fits with the same point that the project will **always** support the latest discord.py version
+## Features
 
-This repository is a template that everyone can use for the start of their Discord bot.
+- **自然言語インターフェース** — `/manage チャンネルを作って` のように日本語/英語でリクエスト可能
+- **調査・実行の分離** — 読み取り専用の調査エージェントと、書き込みの実行エージェントが完全に分離
+- **承認フロー** — 実行前に対象と内容を表示し、ボタンで承認/拒否。todos の改ざん検出 (SHA-256) 付き
+- **権限チェック** — 実行エージェントの各アクションに必要な Discord 権限をマッピング。権限不足のアクションは自動ブロック
+- **反復的計画** — LLM プランナーが最大 5 回のループで調査結果を収集し、最適な実行計画を立案
+- **会話履歴** — 直近 5 ターンのコンテキストで文脈を維持
+- **i18n** — 日本語 (ja) / 英語 (en) 対応
+- **Ban/Kick DM 通知** — Embed でサーバー名・理由・メッセージを通知 (DM ブロック時は無視)
 
-When I first started creating my Discord bot it took me a while to get everything setup and working with cogs and more.
-I would've been happy if there were any template existing. However, there wasn't any existing template. That's why I
-decided to create my own template to let **you** guys create your Discord bot easily.
-
-Please note that this template is not supposed to be the best template, but a good template to start learning how
-discord.py works and to make your own bot easily.
-
-If you plan to use this template to make your own template or bot, you **have to**:
-
-- Keep the credits, and a link to this repository in all the files that contains my code
-- Keep the same license for unchanged code
-
-See [the license file](https://github.com/kkrypt0nn/Python-Discord-Bot-Template/blob/master/LICENSE.md) for more
-information, I reserve the right to take down any repository that does not meet these requirements.
-
-## Support
-
-Before requesting support, you should know that this template requires you to have at least a **basic knowledge** of
-Python and the library is made for **advanced users**. Do not use this template if you don't know the
-basics or some advanced topics such as OOP or async. [Here's](https://pythondiscord.com/pages/resources) a link for resources to learn python.
-
-If you need some help for something, do not hesitate to create an issue over [here](https://github.com/kkrypt0nn/Python-Discord-Bot-Template/issues), but don't forget the read the [frequently asked questions](https://github.com/kkrypt0nn/Python-Discord-Bot-Template/wiki/Frequently-Asked-Questions) before.
-
-All the updates of the template are available [here](UPDATES.md).
-
-## Disclaimer
-
-Slash commands can take some time to get registered globally, so if you want to test a command you should use
-the `@app_commands.guilds()` decorator so that it gets registered instantly. Example:
-
-```py
-@commands.hybrid_command(
-  name="command",
-  description="Command description",
-)
-@app_commands.guilds(discord.Object(id=GUILD_ID)) # Place your guild ID here
-```
-
-When using the template you confirm that you have read the [license](LICENSE.md) and comprehend that I can take down
-your repository if you do not meet these requirements.
-
-## How to download it
-
-This repository is now a template, on the top left you can simply click on "**Use this template**" to create a GitHub
-repository based on this template.
-
-Alternatively you can do the following:
-
-- Clone/Download the repository
-  - To clone it and get the updates you can definitely use the command
-    `git clone`
-- Create a Discord bot [here](https://discord.com/developers/applications)
-- Get your bot token
-- Invite your bot on servers using the following invite:
-  https://discord.com/oauth2/authorize?&client_id=YOUR_APPLICATION_ID_HERE&scope=bot+applications.commands&permissions=PERMISSIONS (
-  Replace `YOUR_APPLICATION_ID_HERE` with the application ID and replace `PERMISSIONS` with the required permissions
-  your bot needs that it can be get at the bottom of a this
-  page https://discord.com/developers/applications/YOUR_APPLICATION_ID_HERE/bot)
-
-## How to set up
-
-To set up the token you will have to make use of the [`.env.example`](.env.example) file; you should rename it to `.env` and replace the `YOUR_BOT...` content with your actual values that match for your bot.
-
-Alternatively you can simply create a system environment variable with the same names and their respective value.
-
-## How to start
-
-### The _"usual"_ way
-
-To start the bot you simply need to launch, either your terminal (Linux, Mac & Windows), or your Command Prompt (
-Windows)
-.
-
-Before running the bot you will need to install all the requirements with this command:
+## Architecture
 
 ```
-python -m pip install -r requirements.txt
+User Request
+     │
+     ▼
+┌──────────────────────────────────────────────┐
+│           Pre-Approval Workflow              │
+│  (LangGraph StateGraph)                      │
+│                                              │
+│  initialize → plan → [investigate ↻]        │
+│                    → prepare_approval        │
+└──────────────────┬───────────────────────────┘
+                   │
+            Approve / Reject (Discord UI)
+                   │
+                   ▼
+┌──────────────────────────────────────────────┐
+│           Post-Approval Workflow             │
+│                                              │
+│  check_approval → run_execution → finalize   │
+└──────────────────────────────────────────────┘
 ```
 
-After that you can start it with
+## Agents
 
-```
-python bot.py
+### Investigation (読み取り専用 — 20 agents)
+
+| Agent | 対象 |
+|-------|------|
+| server | サーバー情報 (名前、メンバー数、機能など) |
+| channel | テキスト/ボイス/ステージチャンネル |
+| category | カテゴリ |
+| thread | スレッド |
+| forum | フォーラムチャンネル |
+| message | メッセージ |
+| role | ロール |
+| permission | チャンネル権限上書き |
+| member | メンバー情報 |
+| vc | ボイスチャンネルの状態 |
+| stage | ステージインスタンス |
+| event | スケジュール済みイベント |
+| automod | AutoMod ルール |
+| invite | 招待リンク |
+| webhook | Webhook |
+| emoji | 絵文字 |
+| sticker | スタンプ |
+| soundboard | サウンドボード |
+| audit_log | 監査ログ |
+| poll | 投票 |
+
+### Execution (書き込み — 承認必須, 19 agents)
+
+| Agent | アクション |
+|-------|-----------|
+| server | name, description, icon, banner, verification_level, system/rules/safety/afk/public_updates channels, content_filter, notification_level |
+| channel | create, edit, delete, reorder, clone |
+| category | create, edit, delete |
+| thread | create, create_from_message, edit, delete, archive, lock, add/remove member, join, leave |
+| forum | create/edit/delete posts, create/edit/delete tags, create/edit/delete forum channel |
+| message | send, reply, edit, delete, pin, unpin, reactions, bulk_delete, crosspost, suppress_embeds |
+| role | create, edit, delete, reorder, assign, revoke |
+| permission | set, clear, sync, move_to_category |
+| member | edit_nickname, edit_roles, timeout, kick (with DM), ban (with DM), unban |
+| vc | move, mute, unmute, deafen, undeafen, disconnect, edit |
+| stage | create/end instance, update topic, edit channel |
+| event | create, edit, delete |
+| automod | create, edit, delete rules |
+| invite | create, delete |
+| webhook | create, edit, delete, execute |
+| emoji | create, edit, delete |
+| sticker | create, edit, delete |
+| soundboard | create, edit, delete |
+| poll | create, end |
+
+## Getting Started
+
+### Prerequisites
+
+- Python >= 3.10
+- [uv](https://docs.astral.sh/uv/) (recommended)
+- Discord Bot Token
+- OpenAI or Anthropic API Key
+
+### Setup
+
+```bash
+# Clone
+git clone https://github.com/<your-repo>/dicord-chat.git
+cd dicord-chat
+
+# Install dependencies
+uv sync
+
+# Configure environment
+cp .env.example .env
+# Edit .env with your tokens
 ```
 
-> **Note**: You may need to replace `python` with `py`, `python3`, `python3.11`, etc. depending on what Python versions you have installed on the machine.
+### Environment Variables
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `DISCORD_TOKEN` | Yes | — | Discord bot token |
+| `LLM_API_KEY` | Yes | — | OpenAI or Anthropic API key |
+| `LLM_MODEL` | Yes | — | Model name (e.g. `gpt-4o`, `claude-sonnet-4-20250514`) |
+| `LLM_PROVIDER` | No | `openai` | `openai` or `anthropic` |
+| `LLM_BASE_URL` | No | — | Custom API base URL |
+| `DATABASE_URL` | No | `sqlite:///database/bot.db` | SQLite connection string |
+
+### Run
+
+```bash
+uv run python bot.py
+```
 
 ### Docker
 
-Support to start the bot in a Docker container has been added. After having [Docker](https://docker.com) installed on your machine, you can simply execute:
-
-```
+```bash
 docker compose up -d --build
 ```
 
-> **Note**: `-d` will make the container run in detached mode, so in the background.
+## Commands
 
-## Issues or Questions
+| Command | Description |
+|---------|-------------|
+| `/manage <request>` | 自然言語でサーバー管理をリクエスト |
+| `/help` | コマンド一覧 |
+| `/ping` | レイテンシ確認 |
 
-If you have any issues or questions of how to code a specific command, you can:
+## Testing
 
-- Join my Discord server [here](https://discord.gg/xj6y5ZaTMr)
-- Post them [here](https://github.com/kkrypt0nn/Python-Discord-Bot-Template/issues)
+```bash
+uv run pytest
+```
 
-Me or other people will take their time to answer and help you.
+514 tests covering all investigation/execution agents and workflow logic.
 
-## Versioning
+## Project Structure
 
-We use [SemVer](http://semver.org) for versioning. For the versions available, see
-the [tags on this repository](https://github.com/kkrypt0nn/Python-Discord-Bot-Template/tags).
-
-## Built With
-
-- [Python 3.12.12](https://www.python.org/)
+```
+bot.py                  # エントリーポイント
+agents/
+  base.py               # エージェント基底クラス
+  main_agent.py         # オーケストレーター (LLM プランナー)
+  prompts.py            # LLM プロンプト
+  registry.py           # エージェント動的ローダー
+  log.py                # リクエストログ (JSONL)
+  investigation/        # 20 調査エージェント
+  execution/            # 19 実行エージェント
+graph/
+  state.py              # AgentState TypedDict
+  workflow.py           # LangGraph ワークフロー定義
+  llm.py                # LLM ファクトリ
+cogs/
+  agent_cog.py          # /manage コマンド + 承認UI
+  general.py            # /help, /ping
+database/               # SQLite (会話履歴, 承認記録)
+locales/
+  en.json               # English
+  ja.json               # 日本語
+i18n.py                 # 翻訳モジュール
+formatters/
+  response.py           # レスポンス整形
+tests/                  # 514 tests
+```
 
 ## License
 
-This project is licensed under the Apache License 2.0 - see the [LICENSE.md](LICENSE.md) file for details
+Apache License 2.0 — see [LICENSE.md](LICENSE.md)

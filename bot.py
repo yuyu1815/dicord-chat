@@ -118,6 +118,26 @@ class DiscordBot(commands.Bot):
         """メッセージ受信時にコマンドを処理する。ボット自身のメッセージは無視する。"""
         if message.author == self.user or message.author.bot:
             return
+
+        # @mention で /manage と同じ処理を呼び出す
+        if self.user.mentioned_in(message) and not message.mention_everyone:
+            content = message.content
+            # ボットのメンションを除去 ("manage" キーワードも省略)
+            for pattern in (f"<@{self.user.id}>", f"<@!{self.user.id}>"):
+                content = content.replace(pattern, "")
+            content = content.strip()
+            # 先頭の "manage" があれば除去
+            if content.lower().startswith("manage"):
+                content = content[len("manage"):].strip()
+            if content:
+                # Cog がロード済みなら manage コマンドをシミュレート
+                manage_cmd = self.get_command("manage")
+                if manage_cmd:
+                    ctx = await self.get_context(message)
+                    ctx.kwargs = {"request": content}
+                    await manage_cmd.callback(ctx, request=content)
+                    return
+
         await self.process_commands(message)
 
 
