@@ -7,6 +7,10 @@ import discord
 from discord.ext import commands
 from dotenv import load_dotenv
 
+from agents.main_agent import MainAgent
+from graph.llm import create_llm
+from i18n import DiscordCommandTranslator
+
 load_dotenv()
 
 logging.basicConfig(level=logging.INFO)
@@ -47,10 +51,6 @@ class DiscordBot(commands.Bot):
     async def setup_hook(self) -> None:
         """ボット起動時の初期化処理。データベース・LLM・エージェント・Cogを読み込む。"""
         await self._init_database()
-
-        from agents.main_agent import MainAgent
-        from graph.llm import create_llm
-        from i18n import DiscordCommandTranslator
 
         await self.tree.set_translator(DiscordCommandTranslator())
 
