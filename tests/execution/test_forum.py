@@ -135,7 +135,7 @@ async def test_delete_post(mock_guild, approved_state, mock_forum_channel):
     thread.starter_message_id = 7001
     thread.delete = AsyncMock()
     mock_forum_channel.threads = [thread]
-    mock_guild.text_channels = [mock_forum_channel]
+    mock_guild.channels = [mock_forum_channel]
 
     approved_state["todos"] = [{"agent": "forum_execution", "action": "delete_post", "params": {"message_id": 6001}}]
 
@@ -151,7 +151,7 @@ async def test_delete_post(mock_guild, approved_state, mock_forum_channel):
 async def test_delete_post_not_found(mock_guild, approved_state):
     # Arrange
     agent = ForumExecutionAgent()
-    mock_guild.text_channels = []
+    mock_guild.channels = []
     approved_state["todos"] = [{"agent": "forum_execution", "action": "delete_post", "params": {"message_id": 99999}}]
 
     # Act
