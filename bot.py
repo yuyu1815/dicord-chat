@@ -64,7 +64,6 @@ class DiscordBot(commands.Bot):
             self.logger.warning("LLM not configured, /manage command will not work: %s", e)
             self.main_agent = None
 
-        self._cog_args = {"main_agent": main_agent}
         for file in os.listdir("cogs"):
             if file.endswith(".py"):
                 await self.load_extension(f"cogs.{file[:-3]}")

@@ -1,5 +1,7 @@
 from typing import Any, Literal
 
+import discord
+
 from typing_extensions import TypedDict
 
 
@@ -41,6 +43,7 @@ class AgentState(TypedDict, total=False):
     channel_id: int
     user_id: int
     user_permissions: dict[str, bool]
+    bot: Any
 
     # 処理中
     todos: list[dict[str, Any]]
@@ -60,6 +63,7 @@ class AgentState(TypedDict, total=False):
     # 計画ループ
     plan_status: Literal[
         "planning", "investigating", "ready_for_approval",
+        "done_no_execution",
         "approved", "rejected", "executing", "completed", "error",
     ]
     planning_iteration: int

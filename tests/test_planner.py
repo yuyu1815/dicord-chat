@@ -435,6 +435,45 @@ async def test_plan_next_step_json_with_codeblock(planner, mock_llm, base_state)
     assert result["summary"] == "Parsed from codeblock"
 
 
+@pytest.mark.asyncio
+async def test_plan_next_step_json_with_leading_text(planner, mock_llm, base_state):
+    """LLMレスポンスにJSONの前にテキストがあってもパースできること。"""
+    mock_llm.ainvoke.return_value = MagicMock(
+        content='Here is my analysis:\n```json\n{"status": "done_no_execution", "investigation_targets": [], "execution_candidates": [], "summary": "Leading text handled"}\n```'
+    )
+
+    result = await planner.plan_next_step(base_state)
+
+    assert result["status"] == "done_no_execution"
+    assert result["summary"] == "Leading text handled"
+
+
+@pytest.mark.asyncio
+async def test_plan_next_step_json_codeblock_no_lang(planner, mock_llm, base_state):
+    """言語指定なしの`````` コードブロックでもパースできること。"""
+    mock_llm.ainvoke.return_value = MagicMock(
+        content='```\n{"status": "done_no_execution", "investigation_targets": [], "execution_candidates": [], "summary": "No lang tag"}\n```'
+    )
+
+    result = await planner.plan_next_step(base_state)
+
+    assert result["status"] == "done_no_execution"
+    assert result["summary"] == "No lang tag"
+
+
+@pytest.mark.asyncio
+async def test_plan_next_step_json_wrapped_in_plain_prose(planner, mock_llm, base_state):
+    """fenceなしの説明文に埋め込まれたJSONでもパースできること。"""
+    mock_llm.ainvoke.return_value = MagicMock(
+        content='After checking the request, the correct output is {"status": "done_no_execution", "investigation_targets": [], "execution_candidates": [], "summary": "Plain prose handled"}. End of response.'
+    )
+
+    result = await planner.plan_next_step(base_state)
+
+    assert result["status"] == "done_no_execution"
+    assert result["summary"] == "Plain prose handled"
+
+
 # --- MainAgent.parse_request / build_todos backward compatibility ---
 
 

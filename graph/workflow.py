@@ -53,13 +53,11 @@ def build_pre_approval_workflow() -> StateGraph:
 
     async def plan_next_step(state: AgentState) -> dict[str, Any]:
         """LLMに次の計画ステップを決定させる。"""
-        from agents.main_agent import MainAgent
-
-        llm = _get_llm()
-        if not llm:
+        bot = state.get("bot")
+        planner = getattr(bot, "main_agent", None) if bot else None
+        if not planner:
             return {"plan_status": "error", "error": "LLM not available"}
 
-        planner = MainAgent(llm)
         decision = await planner.plan_next_step(state)
 
         iteration = state.get("planning_iteration", 0) + 1
@@ -110,9 +108,10 @@ def build_pre_approval_workflow() -> StateGraph:
                 "planning_history": history,
                 "draft_todos": [],
                 "pending_investigation_todos": [],
-                "plan_status": "ready_for_approval",
+                "plan_status": "done_no_execution",
                 "approval_required": False,
                 "approval_summary": decision.get("summary", ""),
+                "approval_status": "none",
             }
         else:
             return {
@@ -138,6 +137,9 @@ def build_pre_approval_workflow() -> StateGraph:
         investigation_state["todos"] = investigation_todos
 
         try:
+            bot = state.get("bot")
+            guild = bot.get_guild(state.get("guild_id")) if bot else None
+
             results: dict[str, Any] = {}
             for todo in investigation_todos:
                 agent_name = todo.get("agent", "")
@@ -145,15 +147,19 @@ def build_pre_approval_workflow() -> StateGraph:
                 agent = _load_agent_module(target, "investigation")
                 if not agent:
                     continue
+                if not guild:
+                    logger.warning("Guild %s not found for investigation %s", state.get("guild_id"), agent_name)
+                    results[agent.name] = {"error": "Guild not found"}
+                    continue
                 try:
-                    new_state = await agent.run(investigation_state, None)
-                    key = f"investigation_{target}"
+                    new_state = await agent.run(investigation_state, guild)
+                    key = agent.name
                     results[key] = new_state.get(
                         "investigation_results", {},
                     ).get(agent.name, {})
                 except Exception as e:
                     logger.error("Investigation agent %s failed: %s", agent_name, e)
-                    results[f"investigation_{target}"] = {"error": str(e)}
+                    results[agent.name] = {"error": str(e)}
 
             merged_results = dict(state.get("investigation_results", {}))
             merged_results.update(results)
@@ -210,6 +216,22 @@ def build_pre_approval_workflow() -> StateGraph:
 
     workflow.add_node("finalize_error", finalize_error)
 
+    def finalize_no_execution(state: AgentState) -> dict[str, Any]:
+        """調査のみで実行不要な場合の最終応答を生成する。"""
+        summary = state.get("approval_summary", state.get("investigation_summary", ""))
+        parts = []
+        inv_summary = state.get("investigation_summary", "")
+        if inv_summary:
+            parts.append(inv_summary)
+        if summary and summary != inv_summary:
+            parts.append(summary)
+        return {
+            "final_response": "\n\n".join(parts) if parts else "Investigation complete.",
+            "plan_status": "done_no_execution",
+        }
+
+    workflow.add_node("finalize_no_execution", finalize_no_execution)
+
     # --- エッジ ---
     workflow.add_edge("initialize_request", "plan_next_step")
 
@@ -219,11 +241,14 @@ def build_pre_approval_workflow() -> StateGraph:
             return "run_investigations"
         if plan_status == "ready_for_approval":
             return "prepare_approval"
+        if plan_status == "done_no_execution":
+            return "finalize_no_execution"
         return "finalize_error"
 
     workflow.add_conditional_edges("plan_next_step", after_plan, {
         "run_investigations": "run_investigations",
         "prepare_approval": "prepare_approval",
+        "finalize_no_execution": "finalize_no_execution",
         "finalize_error": "finalize_error",
     })
 
@@ -246,6 +271,7 @@ def build_pre_approval_workflow() -> StateGraph:
     })
 
     workflow.add_edge("prepare_approval", END)
+    workflow.add_edge("finalize_no_execution", END)
     workflow.add_edge("finalize_error", END)
 
     return workflow
@@ -288,6 +314,9 @@ def build_post_approval_workflow() -> StateGraph:
         execution_state["approved"] = True
 
         try:
+            bot = state.get("bot")
+            guild = bot.get_guild(state.get("guild_id")) if bot else None
+
             results: dict[str, Any] = {}
             for todo in execution_todos:
                 agent_name = todo.get("agent", "")
@@ -295,15 +324,19 @@ def build_post_approval_workflow() -> StateGraph:
                 agent = _load_agent_module(target, "execution")
                 if not agent:
                     continue
+                if not guild:
+                    logger.warning("Guild %s not found for execution %s", state.get("guild_id"), agent_name)
+                    results[agent.name] = {"error": "Guild not found"}
+                    continue
                 try:
-                    new_state = await agent.run(execution_state, None)
-                    key = f"execution_{target}"
+                    new_state = await agent.run(execution_state, guild)
+                    key = agent.name
                     results[key] = new_state.get(
                         "execution_results", {},
                     ).get(agent.name, {})
                 except Exception as e:
                     logger.error("Execution agent %s failed: %s", agent_name, e)
-                    results[f"execution_{target}"] = {"error": str(e)}
+                    results[agent.name] = {"error": str(e)}
 
             merged_results = dict(state.get("execution_results", {}))
             merged_results.update(results)
@@ -382,21 +415,3 @@ def build_workflow() -> StateGraph:
         空の :class:`StateGraph` インスタンス。
     """
     return build_pre_approval_workflow()
-
-
-def _get_llm():
-    """LLMインスタンスを取得する。"""
-    try:
-        import os
-
-        from langchain_openai import ChatOpenAI
-
-        api_key = os.environ.get("OPENAI_API_KEY")
-        base_url = os.environ.get("OPENAI_BASE_URL")
-        model = os.environ.get("LLM_MODEL", "gpt-4o")
-        if base_url:
-            return ChatOpenAI(api_key=api_key, base_url=base_url, model=model)
-        return ChatOpenAI(api_key=api_key, model=model)
-    except Exception as e:
-        logger.error("Failed to initialize LLM: %s", e)
-        return None

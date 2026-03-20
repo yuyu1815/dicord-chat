@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 from typing import Any
 
 from langchain_core.language_models import BaseChatModel
@@ -8,6 +9,67 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from graph.state import AgentState
 
 logger = logging.getLogger("discord_bot")
+
+
+def _extract_first_json_object(text: str) -> str:
+    """文字列中から最初のトップレベルJSONオブジェクトを抽出する。"""
+    start = text.find("{")
+    while start != -1:
+        depth = 0
+        in_string = False
+        escape = False
+
+        for index in range(start, len(text)):
+            char = text[index]
+
+            if in_string:
+                if escape:
+                    escape = False
+                elif char == "\\":
+                    escape = True
+                elif char == '"':
+                    in_string = False
+                continue
+
+            if char == '"':
+                in_string = True
+            elif char == "{":
+                depth += 1
+            elif char == "}":
+                depth -= 1
+                if depth == 0:
+                    return text[start:index + 1]
+
+        start = text.find("{", start + 1)
+
+    raise ValueError("No JSON object found in LLM response")
+
+
+
+def _parse_json_from_llm(text: str) -> dict[str, Any]:
+    """LLMの出力からJSONオブジェクトを抽出・パースする。
+
+    fenced code block、生JSON、前後に説明文があるJSONを扱う。
+
+    Args:
+        text: LLMのレスポンステキスト。
+
+    Returns:
+        パースされた辞書。パース失敗時は :class:`ValueError` を送出する。
+    """
+    text = text.strip()
+
+    match = re.search(r"```(?:json)?\s*\n?(.*?)\n?\s*```", text, re.DOTALL)
+    candidate = match.group(1).strip() if match else text
+
+    try:
+        parsed = json.loads(candidate)
+    except json.JSONDecodeError:
+        parsed = json.loads(_extract_first_json_object(candidate))
+
+    if not isinstance(parsed, dict):
+        raise ValueError("Expected a JSON object from LLM response")
+    return parsed
 
 INVESTIGATION_TARGETS = [
     "server", "channel", "category", "thread", "forum",
@@ -105,7 +167,7 @@ class MainAgent:
                 SystemMessage(content=prompt),
                 HumanMessage(content=state["request"]),
             ])
-            return json.loads(response.content.strip().strip("```json").strip("```"))
+            return _parse_json_from_llm(response.content)
         except Exception as e:
             logger.error("Failed to parse request with LLM: %s", e)
             return {"investigation_targets": [], "execution_candidates": [], "todos": []}
@@ -181,8 +243,7 @@ class MainAgent:
                 SystemMessage(content=prompt),
                 HumanMessage(content="\n\n".join(context_parts)),
             ])
-            raw = response.content.strip().strip("```json").strip("```")
-            decision = json.loads(raw)
+            decision = _parse_json_from_llm(response.content)
             return _validate_planner_decision(decision)
         except Exception as e:
             logger.error("Failed to plan next step with LLM: %s", e)
