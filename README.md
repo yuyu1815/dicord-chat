@@ -1,17 +1,21 @@
 # AI Discord Server Manager
 
-LLM + LangGraph で動く Discord サーバー管理ボット。自然言語でリクエストを投げると、ボットが調査・計画・承認・実行のフローで自動的にサーバー管理タスクをこなす。
+An LLM-powered Discord server management bot built with LangGraph. Send natural language requests and the bot handles investigation, planning, approval, and execution automatically.
+
+**日本語版**: [README_ja.md](README_ja.md)
 
 ## Features
 
-- **自然言語インターフェース** — `/manage チャンネルを作って` のように日本語/英語でリクエスト可能
-- **調査・実行の分離** — 読み取り専用の調査エージェントと、書き込みの実行エージェントが完全に分離
-- **承認フロー** — 実行前に対象と内容を表示し、ボタンで承認/拒否。todos の改ざん検出 (SHA-256) 付き
-- **権限チェック** — 実行エージェントの各アクションに必要な Discord 権限をマッピング。権限不足のアクションは自動ブロック
-- **反復的計画** — LLM プランナーが最大 5 回のループで調査結果を収集し、最適な実行計画を立案
-- **会話履歴** — 直近 5 ターンのコンテキストで文脈を維持
-- **i18n** — 日本語 (ja) / 英語 (en) 対応
-- **Ban/Kick DM 通知** — Embed でサーバー名・理由・メッセージを通知 (DM ブロック時は無視)
+- **Natural Language Interface** — Request server management in Japanese or English (e.g. `/manage チャンネルを作って`)
+- **Investigation / Execution Separation** — Read-only investigation agents and write execution agents are fully separated
+- **Approval Flow** — Shows targets and details before execution with approve/reject buttons. SHA-256 tamper detection on todos
+- **Permission Checks** — Each execution action maps to required Discord permissions. Insufficient permissions are auto-blocked
+- **Iterative Planning** — LLM planner loops up to 5 times to gather investigation results and build optimal execution plans
+- **Conversation History** — Maintains context across the last 5 turns
+- **i18n** — Japanese (ja) / English (en) support
+- **Media Support** — Create emojis, stickers, soundboard sounds, and server icons/banners from URLs or Discord message attachments. Auto-extracts IDs from message links
+- **Audio Processing** — Truncates audio to 5 seconds for soundboard via PyAV (MP3 stream copy / libmp3lame re-encode auto-detection)
+- **Ban/Kick DM Notifications** — Sends embed with server name, reason, and message to the target (silently ignores blocked DMs)
 
 ## Architecture
 
@@ -39,35 +43,35 @@ User Request
 
 ## Agents
 
-### Investigation (読み取り専用 — 20 agents)
+### Investigation (read-only — 20 agents)
 
-| Agent | 対象 |
-|-------|------|
-| server | サーバー情報 (名前、メンバー数、機能など) |
-| channel | テキスト/ボイス/ステージチャンネル |
-| category | カテゴリ |
-| thread | スレッド |
-| forum | フォーラムチャンネル |
-| message | メッセージ |
-| role | ロール |
-| permission | チャンネル権限上書き |
-| member | メンバー情報 |
-| vc | ボイスチャンネルの状態 |
-| stage | ステージインスタンス |
-| event | スケジュール済みイベント |
-| automod | AutoMod ルール |
-| invite | 招待リンク |
-| webhook | Webhook |
-| emoji | 絵文字 |
-| sticker | スタンプ |
-| soundboard | サウンドボード |
-| audit_log | 監査ログ |
-| poll | 投票 |
+| Agent | Description |
+|-------|-------------|
+| server | Server info (name, member count, features, etc.) |
+| channel | Text/voice/stage channels (includes `permissions_synced`) |
+| category | Categories |
+| thread | Threads |
+| forum | Forum channels |
+| message | Messages |
+| role | Roles |
+| permission | Channel permission overwrites |
+| member | Member info |
+| vc | Voice channel state, current members, permission sync status |
+| stage | Stage instances |
+| event | Scheduled events |
+| automod | AutoMod rules |
+| invite | Invite links |
+| webhook | Webhooks |
+| emoji | Custom emojis |
+| sticker | Stickers |
+| soundboard | Soundboard sounds |
+| audit_log | Audit log |
+| poll | Polls |
 
-### Execution (書き込み — 承認必須, 19 agents)
+### Execution (write — requires approval, 19 agents)
 
-| Agent | アクション |
-|-------|-----------|
+| Agent | Actions |
+|-------|---------|
 | server | name, description, icon, banner, verification_level, system/rules/safety/afk/public_updates channels, content_filter, notification_level |
 | channel | create, edit, delete, reorder, clone |
 | category | create, edit, delete |
@@ -83,9 +87,9 @@ User Request
 | automod | create, edit, delete rules |
 | invite | create, delete |
 | webhook | create, edit, delete, execute |
-| emoji | create, edit, delete |
-| sticker | create, edit, delete |
-| soundboard | create, edit, delete |
+| emoji | create (URL / message attachment), edit, delete |
+| sticker | create (URL / message attachment), edit, delete |
+| soundboard | create (URL / message attachment, auto 5s truncate), edit, delete |
 | poll | create, end |
 
 ## Getting Started
@@ -93,9 +97,9 @@ User Request
 ### Prerequisites
 
 - Python >= 3.10
-- [uv](https://docs.astral.sh/uv/) (recommended)
-- Discord Bot Token
-- OpenAI or Anthropic API Key
+- [uv](https://docs.astral.sh/uv/) (recommended) or pip
+- A Discord Bot Token ([Discord Developer Portal](https://discord.com/developers/applications))
+- An LLM API key (OpenAI, Anthropic, or OpenAI-compatible endpoint)
 
 ### Setup
 
@@ -106,10 +110,19 @@ cd dicord-chat
 
 # Install dependencies
 uv sync
+# or: pip install -r requirements.txt
 
 # Configure environment
 cp .env.example .env
-# Edit .env with your tokens
+```
+
+Edit `.env` with your credentials:
+
+```env
+DISCORD_TOKEN=your_bot_token
+LLM_PROVIDER=openai
+LLM_MODEL=gpt-4o
+LLM_API_KEY=your_api_key
 ```
 
 ### Environment Variables
@@ -120,7 +133,7 @@ cp .env.example .env
 | `LLM_API_KEY` | Yes | — | OpenAI or Anthropic API key |
 | `LLM_MODEL` | Yes | — | Model name (e.g. `gpt-4o`, `claude-sonnet-4-20250514`) |
 | `LLM_PROVIDER` | No | `openai` | `openai` or `anthropic` |
-| `LLM_BASE_URL` | No | — | Custom API base URL |
+| `LLM_BASE_URL` | No | — | Custom API base URL (OpenAI-compatible) |
 | `DATABASE_URL` | No | `sqlite:///database/bot.db` | SQLite connection string |
 
 ### Run
@@ -139,9 +152,9 @@ docker compose up -d --build
 
 | Command | Description |
 |---------|-------------|
-| `/manage <request>` | 自然言語でサーバー管理をリクエスト |
-| `/help` | コマンド一覧 |
-| `/ping` | レイテンシ確認 |
+| `/manage <request>` | Natural language server management request |
+| `/help` | Command list |
+| `/ping` | Latency check |
 
 ## Testing
 
@@ -149,35 +162,36 @@ docker compose up -d --build
 uv run pytest
 ```
 
-514 tests covering all investigation/execution agents and workflow logic.
+553 tests covering all investigation/execution agents and workflow logic.
 
 ## Project Structure
 
 ```
-bot.py                  # エントリーポイント
+bot.py                  # Entry point
 agents/
-  base.py               # エージェント基底クラス
-  main_agent.py         # オーケストレーター (LLM プランナー)
-  prompts.py            # LLM プロンプト
-  registry.py           # エージェント動的ローダー
-  log.py                # リクエストログ (JSONL)
-  investigation/        # 20 調査エージェント
-  execution/            # 19 実行エージェント
+  base.py               # Agent base classes
+  main_agent.py         # Orchestrator (LLM planner)
+  prompts.py            # LLM prompt templates
+  registry.py           # Dynamic agent loader
+  log.py                # Request log (JSONL)
+  investigation/        # 20 investigation agents
+  execution/            # 19 execution agents
 graph/
   state.py              # AgentState TypedDict
-  workflow.py           # LangGraph ワークフロー定義
-  llm.py                # LLM ファクトリ
+  workflow.py           # LangGraph workflow definition
+  llm.py                # LLM factory (OpenAI / Anthropic)
 cogs/
-  agent_cog.py          # /manage コマンド + 承認UI
+  agent_cog.py          # /manage command + approval UI
   general.py            # /help, /ping
-database/               # SQLite (会話履歴, 承認記録)
+database/               # SQLite (conversation history, approval records)
+services/               # Attachment download, audio processing, message search
 locales/
   en.json               # English
-  ja.json               # 日本語
-i18n.py                 # 翻訳モジュール
+  ja.json               # Japanese
+i18n.py                 # Translation module
 formatters/
-  response.py           # レスポンス整形
-tests/                  # 514 tests
+  response.py           # Response formatting
+tests/                  # 553 tests
 ```
 
 ## License
