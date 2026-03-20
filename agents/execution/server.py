@@ -8,13 +8,22 @@ from graph.state import AgentState
 class ServerExecutionAgent(ExecutionAgent):
     """Handles server-wide configuration changes."""
 
+    ACTION_PERMISSIONS: dict[str, list[str]] = {
+        "edit_name": ["manage_guild"],
+        "edit_description": ["manage_guild"],
+        "edit_verification_level": ["manage_guild"],
+        "edit_system_channel": ["manage_guild"],
+        "edit_rules_channel": ["manage_guild"],
+        "edit_banner": ["manage_guild"],
+    }
+
     @property
     def name(self) -> str:
         return "server_execution"
 
     async def execute(self, state: AgentState, guild: discord.Guild) -> dict:
         todos = state.get("todos", [])
-        my_todos = [t for t in todos if t.get("agent") == self.name]
+        my_todos = [t for t in todos if t.get("agent") == self.name and not t.get("_blocked")]
         if not my_todos:
             return {"success": False, "action": "none", "details": "No matching action found"}
 

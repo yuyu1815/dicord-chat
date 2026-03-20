@@ -114,11 +114,15 @@ class AgentCog(commands.Cog):
 
         await ctx.defer()
 
+        perms = ctx.author.guild_permissions
+        user_permissions = {name: value for name, value in perms}
+
         state: AgentState = {
             "request": request,
             "guild_id": ctx.guild.id,
             "channel_id": ctx.channel.id,
             "user_id": ctx.author.id,
+            "user_permissions": user_permissions,
             "todos": [],
             "investigation_results": {},
             "approval_id": str(uuid.uuid4()),
@@ -217,7 +221,13 @@ def _format_results(results: dict[str, Any], title: str) -> str:
             if len(value) > 10:
                 lines.append(f"  - ... and {len(value) - 10} more")
         elif isinstance(value, dict):
+            denied = value.get("permission_denied", [])
+            if denied:
+                for d in denied:
+                    lines.append(f"  - :x: {d['action']}: {d['message']}")
             for k, v in value.items():
+                if k == "permission_denied":
+                    continue
                 text = str(v)
                 if len(text) > 100:
                     text = text[:100] + "..."

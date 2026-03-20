@@ -13,6 +13,11 @@ ACTION_HANDLERS: dict[str, str] = {
 
 
 class InviteExecutionAgent(ExecutionAgent):
+    ACTION_PERMISSIONS: dict[str, list[str]] = {
+        "create": ["create_invite"],
+        "delete": ["manage_channels"],
+    }
+
     @property
     def name(self) -> str:
         return NAME
@@ -42,12 +47,21 @@ class InviteExecutionAgent(ExecutionAgent):
 
     def _find_action(self, state: AgentState) -> str | None:
         for todo in state.get("todos", []):
-            if todo.get("agent") == NAME:
+            if todo.get("agent") == NAME and not todo.get("_blocked"):
                 return todo.get("action")
         return None
 
     async def _do_create(self, guild: discord.Guild, params: dict) -> dict:
-        channel = guild.get_channel(params.get("channel_id", guild.system_channel.id if guild.system_channel else guild.text_channels[0].id))
+        channel_id = params.get("channel_id")
+        if not channel_id:
+            if guild.system_channel:
+                channel_id = guild.system_channel.id
+            elif guild.text_channels:
+                channel_id = guild.text_channels[0].id
+            else:
+                return {"success": False, "action": "create", "details": "No channel available."}
+
+        channel = guild.get_channel(channel_id)
         if not channel:
             return {"success": False, "action": "create", "details": "Channel not found."}
 

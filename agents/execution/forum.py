@@ -7,13 +7,22 @@ from graph.state import AgentState
 class ForumExecutionAgent(ExecutionAgent):
     """Handles forum channel operations: posts and tags."""
 
+    ACTION_PERMISSIONS: dict[str, list[str]] = {
+        "create_post": ["send_messages"],
+        "edit_post": ["manage_messages"],
+        "delete_post": ["manage_threads"],
+        "create_tag": ["manage_channels"],
+        "edit_tag": ["manage_channels"],
+        "delete_tag": ["manage_channels"],
+    }
+
     @property
     def name(self) -> str:
         return "forum_execution"
 
     async def execute(self, state: AgentState, guild: discord.Guild) -> dict:
         todos = state.get("todos", [])
-        my_todos = [t for t in todos if t.get("agent") == self.name]
+        my_todos = [t for t in todos if t.get("agent") == self.name and not t.get("_blocked")]
         if not my_todos:
             return {"success": False, "action": "none", "details": "No matching action found"}
 

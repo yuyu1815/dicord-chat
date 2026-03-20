@@ -7,13 +7,19 @@ from graph.state import AgentState
 class PermissionExecutionAgent(ExecutionAgent):
     """Handles channel permission overwrites: set, delete, sync."""
 
+    ACTION_PERMISSIONS: dict[str, list[str]] = {
+        "set_channel_permission": ["manage_roles"],
+        "delete_channel_permission": ["manage_roles"],
+        "sync_permissions": ["manage_roles"],
+    }
+
     @property
     def name(self) -> str:
         return "permission_execution"
 
     async def execute(self, state: AgentState, guild: discord.Guild) -> dict:
         todos = state.get("todos", [])
-        my_todos = [t for t in todos if t.get("agent") == self.name]
+        my_todos = [t for t in todos if t.get("agent") == self.name and not t.get("_blocked")]
         if not my_todos:
             return {"success": False, "action": "none", "details": "No matching action found"}
 

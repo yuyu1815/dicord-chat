@@ -7,13 +7,23 @@ from graph.state import AgentState
 class VoiceChannelExecutionAgent(ExecutionAgent):
     """Handles voice channel operations: move, mute, deafen, disconnect, edit."""
 
+    ACTION_PERMISSIONS: dict[str, list[str]] = {
+        "move_user": ["move_members"],
+        "mute": ["mute_members"],
+        "unmute": ["mute_members"],
+        "deafen": ["deafen_members"],
+        "undeafen": ["deafen_members"],
+        "disconnect": ["move_members"],
+        "edit_channel": ["manage_channels"],
+    }
+
     @property
     def name(self) -> str:
         return "vc_execution"
 
     async def execute(self, state: AgentState, guild: discord.Guild) -> dict:
         todos = state.get("todos", [])
-        my_todos = [t for t in todos if t.get("agent") == self.name]
+        my_todos = [t for t in todos if t.get("agent") == self.name and not t.get("_blocked")]
         if not my_todos:
             return {"success": False, "action": "none", "details": "No matching action found"}
 

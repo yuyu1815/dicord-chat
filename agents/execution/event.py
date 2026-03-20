@@ -16,6 +16,12 @@ ACTION_HANDLERS: dict[str, str] = {
 
 
 class EventExecutionAgent(ExecutionAgent):
+    ACTION_PERMISSIONS: dict[str, list[str]] = {
+        "create": ["manage_events"],
+        "edit": ["manage_events"],
+        "delete": ["manage_events"],
+    }
+
     @property
     def name(self) -> str:
         return NAME
@@ -45,33 +51,33 @@ class EventExecutionAgent(ExecutionAgent):
 
     def _find_action(self, state: AgentState) -> str | None:
         for todo in state.get("todos", []):
-            if todo.get("agent") == NAME:
+            if todo.get("agent") == NAME and not todo.get("_blocked"):
                 return todo.get("action")
         return None
 
-    def _parse_event_type(self, raw: str | None) -> discord.EventLocation:
+    def _parse_event_type(self, raw: str | None) -> discord.EntityType:
         type_map = {
-            "stage_instance": discord.EventLocation.stage_instance,
-            "voice": discord.EventLocation.voice,
-            "external": discord.EventLocation.external,
+            "stage_instance": discord.EntityType.stage_instance,
+            "voice": discord.EntityType.voice,
+            "external": discord.EntityType.external,
         }
         value = raw or "external"
-        return type_map.get(value, discord.EventLocation.external)
+        return type_map.get(value, discord.EntityType.external)
 
     async def _do_create(self, guild: discord.Guild, params: dict) -> dict:
-        location = self._parse_event_type(params.get("entity_type"))
+        entity_type = self._parse_event_type(params.get("entity_type"))
         kwargs: dict = {
             "name": params["name"],
             "start_time": datetime.datetime.fromisoformat(params["start_time"]),
-            "location": location,
+            "entity_type": entity_type,
         }
         if "description" in params:
             kwargs["description"] = params["description"]
         if "end_time" in params:
             kwargs["end_time"] = datetime.datetime.fromisoformat(params["end_time"])
-        if "channel_id" in params and location != discord.EventLocation.external:
+        if "channel_id" in params and entity_type != discord.EntityType.external:
             kwargs["channel"] = guild.get_channel(params["channel_id"])
-        if location == discord.EventLocation.external and "location" in params:
+        if entity_type == discord.EntityType.external and "location" in params:
             kwargs["location"] = params["location"]
 
         event = await guild.create_scheduled_event(**kwargs)

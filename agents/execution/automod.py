@@ -1,3 +1,5 @@
+import datetime
+
 import discord
 from discord import HTTPException
 
@@ -13,57 +15,60 @@ ACTION_HANDLERS: dict[str, str] = {
 }
 
 
-def _build_trigger_metadata(trigger_type: str, metadata: dict | None) -> discord.AutoModTriggerMetadata:
-    if not metadata:
-        return discord.AutoModTriggerMetadata()
-
-    keyword_filter = metadata.get("keyword_filter")
-    regex_patterns = metadata.get("regex_patterns")
-    presets = metadata.get("presets")
-    allow_list = metadata.get("allow_list")
-    mention_total_limit = metadata.get("mention_total_limit")
-
-    return discord.AutoModTriggerMetadata(
-        keyword_filter=keyword_filter,
-        regex_patterns=regex_patterns,
-        presets=[discord.AutoModPresetsType(p) for p in presets] if presets else None,
-        allow_list=allow_list,
-        mention_total_limit=mention_total_limit,
-    )
+def _build_trigger(trigger_type: str, metadata: dict | None) -> discord.AutoModTrigger:
+    kwargs: dict = {"type": _build_trigger_type(trigger_type)}
+    if metadata:
+        if "keyword_filter" in metadata:
+            kwargs["keyword_filter"] = metadata["keyword_filter"]
+        if "regex_patterns" in metadata:
+            kwargs["regex_patterns"] = metadata["regex_patterns"]
+        if "presets" in metadata:
+            kwargs["presets"] = [discord.AutoModPresets(p) for p in metadata["presets"]]
+        if "allow_list" in metadata:
+            kwargs["allow_list"] = metadata["allow_list"]
+        if "mention_total_limit" in metadata:
+            kwargs["mention_limit"] = metadata["mention_total_limit"]
+    return discord.AutoModTrigger(**kwargs)
 
 
-def _build_trigger_type(trigger_type: str) -> discord.AutoModTriggerType:
+def _build_trigger_type(trigger_type: str) -> discord.AutoModRuleTriggerType:
     type_map = {
-        "keyword": discord.AutoModTriggerType.keyword,
-        "harmful_link": discord.AutoModTriggerType.harmful_link,
-        "spam": discord.AutoModTriggerType.spam,
-        "keyword_preset": discord.AutoModTriggerType.keyword_preset,
-        "mention_spam": discord.AutoModTriggerType.mention_spam,
+        "keyword": discord.AutoModRuleTriggerType.keyword,
+        "harmful_link": discord.AutoModRuleTriggerType.harmful_link,
+        "spam": discord.AutoModRuleTriggerType.spam,
+        "keyword_preset": discord.AutoModRuleTriggerType.keyword_preset,
+        "mention_spam": discord.AutoModRuleTriggerType.mention_spam,
     }
-    return type_map.get(trigger_type, discord.AutoModTriggerType.keyword)
+    return type_map.get(trigger_type, discord.AutoModRuleTriggerType.keyword)
 
 
-def _build_actions(actions: list[dict] | None) -> list[discord.AutoModAction]:
+def _build_actions(actions: list[dict] | None) -> list[discord.AutoModRuleAction]:
     if not actions:
         return []
     type_map = {
-        "block_message": discord.AutoModActionType.block_message,
-        "send_alert_message": discord.AutoModActionType.send_alert_message,
-        "timeout": discord.AutoModActionType.timeout,
+        "block_message": discord.AutoModRuleActionType.block_message,
+        "send_alert_message": discord.AutoModRuleActionType.send_alert_message,
+        "timeout": discord.AutoModRuleActionType.timeout,
     }
     result = []
     for a in actions:
-        action_type = type_map.get(a.get("type", "block_message"), discord.AutoModActionType.block_message)
+        action_type = type_map.get(a.get("type", "block_message"), discord.AutoModRuleActionType.block_message)
         kwargs: dict = {"type": action_type}
         if "channel_id" in a:
             kwargs["channel_id"] = a["channel_id"]
         if "duration" in a:
-            kwargs["duration"] = a["duration"]
-        result.append(discord.AutoModAction(**kwargs))
+            kwargs["duration"] = datetime.timedelta(seconds=a["duration"])
+        result.append(discord.AutoModRuleAction(**kwargs))
     return result
 
 
 class AutoModExecutionAgent(ExecutionAgent):
+    ACTION_PERMISSIONS: dict[str, list[str]] = {
+        "create_rule": ["manage_guild"],
+        "edit_rule": ["manage_guild"],
+        "delete_rule": ["manage_guild"],
+    }
+
     @property
     def name(self) -> str:
         return NAME
@@ -93,19 +98,17 @@ class AutoModExecutionAgent(ExecutionAgent):
 
     def _find_action(self, state: AgentState) -> str | None:
         for todo in state.get("todos", []):
-            if todo.get("agent") == NAME:
+            if todo.get("agent") == NAME and not todo.get("_blocked"):
                 return todo.get("action")
         return None
 
     async def _do_create_rule(self, guild: discord.Guild, params: dict) -> dict:
-        trigger_type = _build_trigger_type(params.get("trigger_type", "keyword"))
-        metadata = _build_trigger_metadata(params.get("trigger_type"), params.get("trigger_metadata"))
+        trigger = _build_trigger(params.get("trigger_type", "keyword"), params.get("trigger_metadata"))
         actions = _build_actions(params.get("actions"))
 
         kwargs: dict = {
             "name": params["name"],
-            "trigger_type": trigger_type,
-            "trigger_metadata": metadata,
+            "trigger": trigger,
             "actions": actions,
             "enabled": params.get("enabled", True),
         }

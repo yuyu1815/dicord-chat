@@ -7,13 +7,22 @@ from graph.state import AgentState
 class ThreadExecutionAgent(ExecutionAgent):
     """Handles thread operations (create, edit, archive, lock, membership)."""
 
+    ACTION_PERMISSIONS: dict[str, list[str]] = {
+        "create": ["create_public_threads"],
+        "edit": ["manage_threads"],
+        "delete": ["manage_threads"],
+        "add_member": ["manage_threads"],
+        "join": [],
+        "leave": [],
+    }
+
     @property
     def name(self) -> str:
         return "thread_execution"
 
     async def execute(self, state: AgentState, guild: discord.Guild) -> dict:
         todos = state.get("todos", [])
-        my_todos = [t for t in todos if t.get("agent") == self.name]
+        my_todos = [t for t in todos if t.get("agent") == self.name and not t.get("_blocked")]
         if not my_todos:
             return {"success": False, "action": "none", "details": "No matching action found"}
 

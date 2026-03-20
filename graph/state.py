@@ -11,6 +11,7 @@ class AgentState(TypedDict, total=False):
     guild_id: int
     channel_id: int
     user_id: int
+    user_permissions: dict[str, bool]
 
     # Processing
     todos: list[dict[str, Any]]

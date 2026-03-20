@@ -7,13 +7,25 @@ from graph.state import AgentState
 class MessageExecutionAgent(ExecutionAgent):
     """Handles message send, edit, delete, pin, and reaction operations."""
 
+    ACTION_PERMISSIONS: dict[str, list[str]] = {
+        "send": ["send_messages"],
+        "edit": ["manage_messages"],
+        "delete": ["manage_messages"],
+        "pin": ["manage_messages"],
+        "unpin": ["manage_messages"],
+        "add_reaction": ["add_reactions"],
+        "remove_reaction": ["manage_messages"],
+        "clear_reactions": ["manage_messages"],
+        "bulk_delete": ["manage_messages"],
+    }
+
     @property
     def name(self) -> str:
         return "message_execution"
 
     async def execute(self, state: AgentState, guild: discord.Guild) -> dict:
         todos = state.get("todos", [])
-        my_todos = [t for t in todos if t.get("agent") == self.name]
+        my_todos = [t for t in todos if t.get("agent") == self.name and not t.get("_blocked")]
         if not my_todos:
             return {"success": False, "action": "none", "details": "No matching action found"}
 

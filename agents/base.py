@@ -35,12 +35,41 @@ class InvestigationAgent(BaseAgent):
 class ExecutionAgent(BaseAgent):
     """Write agent that performs changes after user approval."""
 
+    ACTION_PERMISSIONS: dict[str, list[str]] = {}
+
     async def run(self, state: AgentState, guild: Any) -> AgentState:
         if not state.get("approved"):
             raise PermissionError(f"[{self.name}] Execution requires user approval.")
+
+        user_perms = state.get("user_permissions", {})
+        has_admin = user_perms.get("administrator", False)
+
+        denied: list[dict[str, str]] = []
+
+        if not has_admin and self.ACTION_PERMISSIONS:
+            todos = state.get("todos", [])
+            for todo in todos:
+                if todo.get("agent") != self.name:
+                    continue
+                action = todo.get("action", "")
+                required = self.ACTION_PERMISSIONS.get(action, [])
+                missing = [p for p in required if not user_perms.get(p, False)]
+                if missing:
+                    todo["_blocked"] = True
+                    denied.append({
+                        "action": action,
+                        "message": f"このユーザーの権限では実行できません（必要な権限: {', '.join(missing)}）",
+                    })
+
         if "execution_results" not in state:
             state["execution_results"] = {}
+
         result = await self.execute(state, guild)
+
+        if denied:
+            existing = result.get("permission_denied", [])
+            result["permission_denied"] = existing + denied
+
         state["execution_results"][self.name] = result
         return state
 

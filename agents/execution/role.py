@@ -7,13 +7,22 @@ from graph.state import AgentState
 class RoleExecutionAgent(ExecutionAgent):
     """Handles role create, edit, delete, reorder, assign, and revoke operations."""
 
+    ACTION_PERMISSIONS: dict[str, list[str]] = {
+        "create": ["manage_roles"],
+        "edit": ["manage_roles"],
+        "delete": ["manage_roles"],
+        "reorder": ["manage_roles"],
+        "assign": ["manage_roles"],
+        "revoke": ["manage_roles"],
+    }
+
     @property
     def name(self) -> str:
         return "role_execution"
 
     async def execute(self, state: AgentState, guild: discord.Guild) -> dict:
         todos = state.get("todos", [])
-        my_todos = [t for t in todos if t.get("agent") == self.name]
+        my_todos = [t for t in todos if t.get("agent") == self.name and not t.get("_blocked")]
         if not my_todos:
             return {"success": False, "action": "none", "details": "No matching action found"}
 

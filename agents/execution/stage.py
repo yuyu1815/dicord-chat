@@ -15,6 +15,13 @@ ACTION_HANDLERS: dict[str, str] = {
 
 
 class StageExecutionAgent(ExecutionAgent):
+    ACTION_PERMISSIONS: dict[str, list[str]] = {
+        "create_stage_instance": ["manage_channels"],
+        "edit_stage_instance": ["manage_channels", "mute_members"],
+        "delete_stage_instance": ["manage_channels", "mute_members"],
+        "edit_channel": ["manage_channels"],
+    }
+
     @property
     def name(self) -> str:
         return NAME
@@ -44,7 +51,7 @@ class StageExecutionAgent(ExecutionAgent):
 
     def _find_action(self, state: AgentState) -> str | None:
         for todo in state.get("todos", []):
-            if todo.get("agent") == NAME:
+            if todo.get("agent") == NAME and not todo.get("_blocked"):
                 return todo.get("action")
         return None
 

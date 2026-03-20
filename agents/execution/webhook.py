@@ -15,6 +15,13 @@ ACTION_HANDLERS: dict[str, str] = {
 
 
 class WebhookExecutionAgent(ExecutionAgent):
+    ACTION_PERMISSIONS: dict[str, list[str]] = {
+        "create": ["manage_webhooks"],
+        "edit": ["manage_webhooks"],
+        "delete": ["manage_webhooks"],
+        "execute": ["manage_webhooks"],
+    }
+
     @property
     def name(self) -> str:
         return NAME
@@ -44,7 +51,7 @@ class WebhookExecutionAgent(ExecutionAgent):
 
     def _find_action(self, state: AgentState) -> str | None:
         for todo in state.get("todos", []):
-            if todo.get("agent") == NAME:
+            if todo.get("agent") == NAME and not todo.get("_blocked"):
                 return todo.get("action")
         return None
 

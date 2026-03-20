@@ -23,6 +23,12 @@ FORMAT_MAP: dict[str, int] = {
 
 
 class StickerExecutionAgent(ExecutionAgent):
+    ACTION_PERMISSIONS: dict[str, list[str]] = {
+        "create": ["manage_emojis_and_stickers"],
+        "edit": ["manage_emojis_and_stickers"],
+        "delete": ["manage_emojis_and_stickers"],
+    }
+
     @property
     def name(self) -> str:
         return NAME
@@ -52,7 +58,7 @@ class StickerExecutionAgent(ExecutionAgent):
 
     def _find_action(self, state: AgentState) -> str | None:
         for todo in state.get("todos", []):
-            if todo.get("agent") == NAME:
+            if todo.get("agent") == NAME and not todo.get("_blocked"):
                 return todo.get("action")
         return None
 

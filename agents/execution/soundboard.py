@@ -16,6 +16,12 @@ ACTION_HANDLERS: dict[str, str] = {
 
 
 class SoundboardExecutionAgent(ExecutionAgent):
+    ACTION_PERMISSIONS: dict[str, list[str]] = {
+        "create": ["manage_expressions"],
+        "edit": ["manage_expressions"],
+        "delete": ["manage_expressions"],
+    }
+
     @property
     def name(self) -> str:
         return NAME
@@ -45,7 +51,7 @@ class SoundboardExecutionAgent(ExecutionAgent):
 
     def _find_action(self, state: AgentState) -> str | None:
         for todo in state.get("todos", []):
-            if todo.get("agent") == NAME:
+            if todo.get("agent") == NAME and not todo.get("_blocked"):
                 return todo.get("action")
         return None
 
