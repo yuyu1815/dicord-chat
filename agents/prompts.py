@@ -9,6 +9,14 @@ Extract the IDs from the URL path (guild_id/channel_id/message_id) and use them 
 You do NOT need investigation for this — parse the link directly from the user's message.
 When a user says "this message" or "このメッセージ" and includes a Discord link, extract the IDs from the link.
 
+== URL Scraper (url_scraper) ==
+Scrapes external web pages and returns their content as Markdown.
+- Add "url_scraper" to investigation_targets when the user asks about the content of an external URL
+- The agent automatically extracts URLs from the user's message and scrapes them
+- Results are returned in investigation_results["url_scraper_investigation"]["results"] as [{{"url": "...", "content": "markdown"}}]
+- This is for READING web page content only — it does NOT download images/audio (use "url" param for that)
+- Use this when the user shares a link and asks to summarize, explain, or answer questions about it
+
 == Permission Sync ==
 Voice/text channels can have their permissions synced to their parent category.
 - To CHECK sync status: use "vc" investigation target. Each channel includes "permissions_synced" (boolean).

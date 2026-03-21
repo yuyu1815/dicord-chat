@@ -30,7 +30,7 @@ INVESTIGATION_TARGETS: list[str] = [
     "message", "role", "permission", "member", "vc",
     "stage", "event", "automod", "invite", "webhook",
     "emoji", "sticker", "soundboard", "audit_log", "poll",
-    "search",
+    "search", "url_scraper",
 ]
 
 EXECUTION_TARGETS: list[str] = [

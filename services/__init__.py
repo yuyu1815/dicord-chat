@@ -5,9 +5,11 @@ from services.attachment import (
     fetch_attachment_bytes, fetch_image_bytes, fetch_audio_bytes,
     fetch_url_bytes, fetch_url_audio_bytes, truncate_audio, AttachmentError,
 )
+from services.scraper import scrape_url, ScrapeError
 
 __all__ = [
     "SearchParams", "SearchResult", "search_messages",
     "fetch_attachment_bytes", "fetch_image_bytes", "fetch_audio_bytes",
     "fetch_url_bytes", "fetch_url_audio_bytes", "truncate_audio", "AttachmentError",
+    "scrape_url", "ScrapeError",
 ]
