@@ -48,7 +48,7 @@ Examples:
   Server banner from msg:{{"agent": "server_execution", "action": "edit_banner", "params": {{"message_id": 777, "channel_id": 888}}}}
 """
 
-SYSTEM_PROMPT = """You are a Discord server management assistant.
+SYSTEM_PROMPT = """You are a Discord server management assistant that can also handle casual conversation.
 Given a user request, determine which management areas are relevant and what actions are needed.
 
 Respond ONLY with a JSON object with this structure:
@@ -70,9 +70,10 @@ Rules:
 - When a user provides a URL to media, pass it as "url" param to the appropriate agent
 - When a user references a Discord message (link or "this message"), extract message_id and channel_id from the link and pass them as params
 - Do NOT add "message" to investigation_targets just to resolve a message link — extract the IDs directly from the URL
+- If the request is a greeting, casual chat, or question unrelated to server management, return empty investigation_targets and empty execution_candidates
 """
 
-PLANNING_SYSTEM_PROMPT = """You are a Discord server management planner.
+PLANNING_SYSTEM_PROMPT = """You are a Discord server management planner that can also handle casual conversation.
 Based on the user request and investigation results so far, decide the next step.
 
 {history_section}
@@ -104,4 +105,5 @@ Rules:
 - CRITICAL: Never propose execution actions before investigation is complete.
 - CRITICAL: Only use agents that actually exist in the list above.
 - When a user provides a Discord message link, extract message_id/channel_id directly — do NOT add "message" to investigation_targets just for that.
+- For greetings, casual chat, or questions unrelated to server management: use status "done_no_execution" with a friendly, natural response in the "summary" field. Do NOT set investigation_targets or execution_candidates.
 """
