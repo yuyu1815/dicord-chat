@@ -1,3 +1,4 @@
+import uuid
 from typing import Any, Literal
 
 from typing_extensions import TypedDict
@@ -8,6 +9,78 @@ from typing_extensions import TypedDict
 # ---------------------------------------------------------------------------
 
 AgentKind = Literal["investigation", "execution"]
+
+
+# ---------------------------------------------------------------------------
+# Progress tracking
+# ---------------------------------------------------------------------------
+
+TodoStatus = Literal["pending", "approved", "in_progress", "completed", "failed", "skipped"]
+
+TODO_STATUS_EMOJI: dict[TodoStatus, str] = {
+    "pending": "\u23f3",       # ⏳
+    "approved": "\u23f3",      # ⏳
+    "in_progress": "\U0001f504",  # 🔄
+    "completed": "\u2705",     # ✅
+    "failed": "\u274c",        # ❌
+    "skipped": "\u23ed\ufe0f", # ⏭️
+}
+
+
+class TodoProgress(TypedDict, total=True):
+    """Single todo item for progress display.
+
+    Attributes:
+        todo_id: Unique identifier for this todo (short UUID).
+        agent: Agent name (e.g. ``"channel_execution"``).
+        action: Action name.
+        params: Action parameters.
+        status: Current status emoji key.
+        label: Human-readable label for display (max ~40 chars).
+    """
+    todo_id: str
+    agent: str
+    action: str
+    params: dict[str, Any]
+    status: TodoStatus
+    label: str
+
+
+def build_todo_progress(todos: list["Todo"]) -> list[TodoProgress]:
+    """Create a list of TodoProgress from execution todos.
+
+    Each item gets a unique ``todo_id`` (8-char hex from UUID) so that
+    even multiple todos for the same agent can be tracked independently.
+
+    Args:
+        todos: Execution todo list (usually ``proposed_todos``).
+
+    Returns:
+        List of TodoProgress with ``status="pending"``.
+    """
+    result: list[TodoProgress] = []
+    for todo in todos:
+        agent = todo.get("agent", "unknown")
+        action = todo.get("action", "unknown")
+        params = todo.get("params", {})
+        todo_id = uuid.uuid4().hex[:8]
+        # Short label: action + optional name param, capped at 40 chars
+        name = params.get("name")
+        if name:
+            label = f"{action}({name})"
+        else:
+            label = action
+        if len(label) > 40:
+            label = label[:37] + "..."
+        result.append({
+            "todo_id": todo_id,
+            "agent": agent,
+            "action": action,
+            "params": params,
+            "status": "pending",
+            "label": label,
+        })
+    return result
 
 
 def classify_agent_kind(agent_name: str) -> AgentKind | None:
@@ -141,6 +214,10 @@ class AgentState(TypedDict, total=False):
         approval_status: 承認の状態。
         approval_summary: 承認提示用のサマリー。
         investigation_summary: 調査結果のサマリー。
+        progress_plan_message_id: 進捗表示用 plan メッセージのID。
+        progress_thread_id: 進捗ログ用スレッドのID。
+        progress_events: 進捗イベントのログ。
+        todo_progress: 各 todo の進捗表示用データ。
     """
 
     # 入力
@@ -175,7 +252,8 @@ class AgentState(TypedDict, total=False):
     plan_status: Literal[
         "planning", "investigating", "ready_for_approval",
         "done_no_execution",
-        "approved", "rejected", "executing", "completed", "error",
+        "approved", "rejected", "executing", "completed",
+        "completed_with_errors", "error",
     ]
     planning_iteration: int
     max_planning_iterations: int
@@ -190,3 +268,9 @@ class AgentState(TypedDict, total=False):
     approval_status: Literal["pending", "approved", "rejected", "none"]
     approval_summary: str
     investigation_summary: str
+
+    # 進捗表示
+    progress_plan_message_id: int
+    progress_thread_id: int
+    progress_events: list[dict[str, Any]]
+    todo_progress: list[TodoProgress]

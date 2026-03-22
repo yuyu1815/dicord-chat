@@ -8,7 +8,12 @@ import json
 import logging
 from typing import Any
 
-from graph.state import AgentState, is_execution_todo
+from graph.state import (
+    AgentState,
+    TodoProgress,
+    TODO_STATUS_EMOJI,
+    is_execution_todo,
+)
 from i18n import t
 
 logger = logging.getLogger("discord_bot")
@@ -38,6 +43,10 @@ def format_final_response(state: AgentState) -> str:
     """
     locale = state.get("locale", "en")
     parts = []
+
+    investigation_summary = state.get("investigation_summary", "")
+    if investigation_summary:
+        parts.append(investigation_summary)
 
     execution_results = state.get("execution_results", {})
     if execution_results:
@@ -139,3 +148,60 @@ def split_message(text: str, max_length: int = 1900) -> list[str]:
         chunks.append(text[:split_at])
         text = text[split_at:].lstrip("\n")
     return chunks
+
+
+def format_progress_plan(
+    request: str,
+    todo_progress: list[TodoProgress],
+    locale: str = "en",
+) -> str:
+    """Plan message 本文を生成する。絵文字付き checklist を含む。
+
+    Args:
+        request: ユーザーのリクエスト文字列。
+        todo_progress: 各 todo の進捗リスト。
+        locale: 言語コード。
+
+    Returns:
+        フォーマットされた plan メッセージ本文。
+    """
+    parts = [t("cog.request_header", locale=locale, request=request)]
+
+    if todo_progress:
+        header = t("fmt.pending_execution", locale=locale)
+        lines = [header]
+        for i, tp in enumerate(todo_progress, 1):
+            emoji = TODO_STATUS_EMOJI.get(tp.get("status", "pending"), "\u23f3")
+            label = tp.get("label", "unknown")
+            lines.append(f"{emoji} {i}. {label}")
+        parts.append("\n".join(lines))
+
+    return "\n".join(parts)
+
+
+def format_thread_progress_event(
+    event: dict[str, Any],
+    locale: str = "en",
+) -> str:
+    """スレッド内の逐次ログ文面を生成する。
+
+    Args:
+        event: 進捗イベント辞書。
+            必須キー: ``type`` (``"start"``, ``"success"``, ``"error"``)。
+            任意キー: ``agent``, ``label``, ``detail``。
+        locale: 言語コード。
+
+    Returns:
+        フォーマットされたログ文字列。
+    """
+    event_type = event.get("type", "")
+    label = event.get("label", "")
+    detail = event.get("detail", "")
+
+    if event_type == "start":
+        return t("progress.agent_start", locale=locale, label=label)
+    if event_type == "success":
+        return t("progress.agent_success", locale=locale, label=label)
+    if event_type == "error":
+        return t("progress.agent_error", locale=locale, label=label, detail=detail)
+    return f"Unknown event: {event_type or 'none'}"

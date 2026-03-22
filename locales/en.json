@@ -223,5 +223,10 @@
   "inv.channel_not_messageable": "channel {id} is not messageable",
   "inv.search_no_query": "No search query provided",
 
-  "ratelimit.channel_edit_name_topic": "Channel name/topic can only be changed 2 times per 10 minutes. Please wait before trying again."
+  "ratelimit.channel_edit_name_topic": "Channel name/topic can only be changed 2 times per 10 minutes. Please wait before trying again.",
+
+  "progress.agent_start": "\ud83d\udd04 Starting: {label}",
+  "progress.agent_success": "\u2705 Completed: {label}",
+  "progress.agent_error": "\u274c Failed: {label} — {detail}",
+  "progress.thread_name": "Plan: {request}"
 }

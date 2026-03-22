@@ -119,24 +119,23 @@ class DiscordBot(commands.Bot):
         if message.author == self.user or message.author.bot:
             return
 
-        # @mention で /manage と同じ処理を呼び出す
+        self.logger.info(
+            "Message received: author=%s id=%s channel=%s content=%s",
+            message.author.display_name, message.author.id,
+            message.channel.id, message.content[:200],
+        )
+
+        # @mention で manage と同じ処理を呼び出す
         if self.user.mentioned_in(message) and not message.mention_everyone:
             content = message.content
-            # ボットのメンションを除去 ("manage" キーワードも省略)
             for pattern in (f"<@{self.user.id}>", f"<@!{self.user.id}>"):
                 content = content.replace(pattern, "")
             content = content.strip()
-            # 先頭の "manage" があれば除去
-            if content.lower().startswith("manage"):
-                content = content[len("manage"):].strip()
-            if content:
-                # Cog がロード済みなら manage コマンドをシミュレート
-                manage_cmd = self.get_command("manage")
-                if manage_cmd:
-                    ctx = await self.get_context(message)
-                    ctx.kwargs = {"request": content}
-                    await manage_cmd.callback(ctx, request=content)
-                    return
+            cog = self.get_cog("AgentCog")
+            if content and cog:
+                ctx = await self.get_context(message)
+                await cog.handle_manage(ctx, request=content)
+                return
 
         await self.process_commands(message)
 

@@ -14,6 +14,7 @@ from graph.state import (
     PLANNER_STATUS_NEED_INVESTIGATION,
     PLANNER_STATUS_READY_FOR_APPROVAL,
     agent_target_from_name,
+    build_todo_progress,
     is_execution_todo,
 )
 from i18n import t
@@ -69,6 +70,8 @@ def build_pre_approval_workflow() -> StateGraph:
             "approval_summary": "",
             "investigation_summary": "",
             "todos": [],
+            "progress_events": [],
+            "todo_progress": [],
             "investigation_results": {},
             "execution_results": {},
             "error": None,
@@ -325,6 +328,7 @@ def build_pre_approval_workflow() -> StateGraph:
             "todos_version": state.get("todos_version", 0) + 1,
             "approval_status": "pending",
             "plan_status": "ready_for_approval",
+            "todo_progress": build_todo_progress(execution_drafts),
         }
 
     workflow.add_node("prepare_approval", prepare_approval)

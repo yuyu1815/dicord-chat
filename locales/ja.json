@@ -223,5 +223,10 @@
   "inv.channel_not_messageable": "チャンネル {id} はメッセージ送信不可です",
   "inv.search_no_query": "検索クエリが指定されていません",
 
-  "ratelimit.channel_edit_name_topic": "チャンネル名/トピックは10分間に2回まで変更可能です。しばらくお待ちください。"
+  "ratelimit.channel_edit_name_topic": "チャンネル名/トピックは10分間に2回まで変更可能です。しばらくお待ちください。",
+
+  "progress.agent_start": "\ud83d\udd04 開始: {label}",
+  "progress.agent_success": "\u2705 完了: {label}",
+  "progress.agent_error": "\u274c 失敗: {label} — {detail}",
+  "progress.thread_name": "プラン: {request}"
 }
